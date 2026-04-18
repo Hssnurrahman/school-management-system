@@ -1,0 +1,212 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function currentUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && currentUserData().role == role;
+    }
+
+    function isOwner() {
+      return hasRole('owner');
+    }
+
+    function isPrincipal() {
+      return hasRole('principal');
+    }
+
+    function isTeacher() {
+      return hasRole('teacher');
+    }
+
+    function isStudent() {
+      return hasRole('student');
+    }
+
+    function isParent() {
+      return hasRole('parent');
+    }
+
+    function isOwnerOrPrincipal() {
+      return isOwner() || isPrincipal();
+    }
+
+    function isStaff() {
+      return isOwner() || isPrincipal() || isTeacher();
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+    // Owner/principal: full access
+    // Teacher: read all, update own profile only
+    // Student/parent: read and update own profile only
+
+    match /users/{userId} {
+      allow read: if isStaff();
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isOwnerOrPrincipal();
+      allow update: if isOwnerOrPrincipal()
+                    || (isSignedIn() && request.auth.uid == userId
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                            .hasAny(['role', 'isActive', 'additionalRoles']));
+      allow delete: if isOwnerOrPrincipal();
+    }
+
+    // ── Settings ──────────────────────────────────────────────────────────────
+    // Only owner can write school info; all signed-in users can read
+
+    match /settings/{key} {
+      allow read: if isSignedIn();
+      allow write: if isOwner();
+    }
+
+    // ── Classes ───────────────────────────────────────────────────────────────
+
+    match /classes/{classId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Subjects ──────────────────────────────────────────────────────────────
+
+    match /subjects/{subjectId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Fees ──────────────────────────────────────────────────────────────────
+    // Owner/principal: full access
+    // Student: read only their own fees
+
+    match /fees/{feeId} {
+      allow read: if isOwnerOrPrincipal();
+      allow read: if isStudent()
+                  && resource.data.studentId == request.auth.uid;
+      allow create, update, delete: if isOwnerOrPrincipal();
+    }
+
+    // ── Notices ───────────────────────────────────────────────────────────────
+
+    match /notices/{noticeId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
+
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Homework ──────────────────────────────────────────────────────────────
+    // Teachers can create/update/delete; students can read
+
+    match /homework/{hwId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isOwnerOrPrincipal() || isTeacher();
+    }
+
+    // ── Attendance ────────────────────────────────────────────────────────────
+    // Teachers can write; owner/principal can read all; students read own only
+
+    match /attendance/{recordId} {
+      allow read: if isOwnerOrPrincipal() || isTeacher();
+      allow read: if isStudent()
+                  && resource.data.studentId == request.auth.uid;
+      allow write: if isOwnerOrPrincipal() || isTeacher();
+    }
+
+    // ── Grades ────────────────────────────────────────────────────────────────
+
+    match /grades/{gradeId} {
+      allow read: if isOwnerOrPrincipal() || isTeacher();
+      allow read: if isStudent()
+                  && resource.data.studentId == request.auth.uid;
+      allow write: if isOwnerOrPrincipal() || isTeacher();
+    }
+
+    // ── Exams ─────────────────────────────────────────────────────────────────
+
+    match /exams/{examId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal() || isTeacher();
+    }
+
+    // ── Exam Results ──────────────────────────────────────────────────────────
+
+    match /exam_results/{resultId} {
+      allow read: if isOwnerOrPrincipal() || isTeacher();
+      allow read: if isStudent()
+                  && resource.data.studentId == request.auth.uid;
+      allow write: if isOwnerOrPrincipal() || isTeacher();
+    }
+
+    // ── Timetable ─────────────────────────────────────────────────────────────
+
+    match /timetable/{entryId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Lessons ───────────────────────────────────────────────────────────────
+
+    match /lessons/{lessonId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal() || isTeacher();
+    }
+
+    // ── Inventory ─────────────────────────────────────────────────────────────
+
+    match /inventory/{itemId} {
+      allow read: if isOwnerOrPrincipal();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Library ───────────────────────────────────────────────────────────────
+
+    match /library_books/{bookId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Transport ─────────────────────────────────────────────────────────────
+
+    match /transport_routes/{routeId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+
+    match /notifications/{notifId} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    // ── Teacher assignments ───────────────────────────────────────────────────
+
+    match /teacher_classes/{docId} {
+      allow read: if isStaff();
+      allow write: if isOwnerOrPrincipal();
+    }
+
+    match /teacher_subjects/{docId} {
+      allow read: if isStaff();
+      allow write: if isOwnerOrPrincipal() || isTeacher();
+    }
+
+    match /teacher_class_subjects/{docId} {
+      allow read: if isStaff();
+      allow write: if isOwnerOrPrincipal() || isTeacher();
+    }
+  }
+}

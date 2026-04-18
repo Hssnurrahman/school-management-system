@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1018433624543",
+    "project_id": "schoolify-7c11a",
+    "storage_bucket": "schoolify-7c11a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1018433624543:android:7d000d5758e767ae03cc6a",
+        "android_client_info": {
+          "package_name": "com.example.school_management_system"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmrkDGzlK_-52n0zWuK7eWAI4ipBlinvE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
