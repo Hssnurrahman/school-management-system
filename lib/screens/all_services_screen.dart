@@ -14,9 +14,10 @@ import 'transport_screen.dart';
 import 'library_screen.dart';
 import 'settings_screen.dart';
 import 'classes_screen.dart';
-import 'marks_screen.dart';
+import 'exam_screen.dart';
 import 'lessons_screen.dart';
 import 'student_attendance_screen.dart';
+import 'student_reports_screen.dart';
 
 class ServiceItem {
   final String label;
@@ -69,40 +70,252 @@ class _AllServicesScreenState extends State<AllServicesScreen>
 
   List<ServiceItem> _getServices() {
     switch (widget.role) {
-      case UserRole.admin:
+      case UserRole.owner:
+      case UserRole.principal:
         return [
-          ServiceItem(label: 'Users', icon: Icons.people_alt_rounded, gradient: [const Color(0xFF6366F1), const Color(0xFF8B5CF6)], category: 'Management', onTap: () => _nav(context, const ManageUsersScreen())),
-          ServiceItem(label: 'Classes', icon: Icons.school_rounded, gradient: [const Color(0xFF10B981), const Color(0xFF34D399)], category: 'Management', onTap: () => _nav(context, const ClassesScreen())),
-          ServiceItem(label: 'Finance', icon: Icons.payments_rounded, gradient: [const Color(0xFF14B8A6), const Color(0xFF2DD4BF)], category: 'Management', onTap: () => _nav(context, const FeesScreen())),
-          ServiceItem(label: 'Notices', icon: Icons.campaign_rounded, gradient: [const Color(0xFFF59E0B), const Color(0xFFFBBF24)], category: 'Communication', onTap: () => _nav(context, const NoticeBoardScreen())),
-          ServiceItem(label: 'Events', icon: Icons.event_rounded, gradient: [const Color(0xFFEC4899), const Color(0xFFF472B6)], category: 'Communication', onTap: () => _nav(context, const EventsScreen())),
-          ServiceItem(label: 'Inventory', icon: Icons.inventory_2_rounded, gradient: [const Color(0xFF8B5CF6), const Color(0xFFC084FC)], category: 'Operations', onTap: () => _nav(context, const InventoryScreen())),
-          ServiceItem(label: 'Transport', icon: Icons.directions_bus_rounded, gradient: [const Color(0xFFEF4444), const Color(0xFFF87171)], category: 'Operations', onTap: () => _nav(context, const TransportScreen())),
-          ServiceItem(label: 'Library', icon: Icons.local_library_rounded, gradient: [const Color(0xFF3B82F6), const Color(0xFF60A5FA)], category: 'Operations', onTap: () => _nav(context, const LibraryScreen())),
-          ServiceItem(label: 'Settings', icon: Icons.settings_rounded, gradient: [const Color(0xFF64748B), const Color(0xFF94A3B8)], category: 'General', onTap: () => _nav(context, const SettingsScreen())),
+          ServiceItem(
+            label: 'Users',
+            icon: Icons.people_alt_rounded,
+            gradient: [const Color(0xFF0EA5E9), const Color(0xFF0284C7)],
+            category: 'Management',
+            onTap: () => _nav(context, const ManageUsersScreen()),
+          ),
+          ServiceItem(
+            label: 'Classes',
+            icon: Icons.school_rounded,
+            gradient: [const Color(0xFF10B981), const Color(0xFF34D399)],
+            category: 'Management',
+            onTap: () => _nav(context, const ClassesScreen()),
+          ),
+          ServiceItem(
+            label: 'Finance',
+            icon: Icons.payments_rounded,
+            gradient: [const Color(0xFF14B8A6), const Color(0xFF2DD4BF)],
+            category: 'Management',
+            onTap: () => _nav(context, const FeesScreen()),
+          ),
+          ServiceItem(
+            label: 'Notices',
+            icon: Icons.campaign_rounded,
+            gradient: [const Color(0xFFF59E0B), const Color(0xFFFBBF24)],
+            category: 'Communication',
+            onTap: () => _nav(context, const NoticeBoardScreen()),
+          ),
+          ServiceItem(
+            label: 'Events',
+            icon: Icons.event_rounded,
+            gradient: [const Color(0xFFEC4899), const Color(0xFFF472B6)],
+            category: 'Communication',
+            onTap: () => _nav(context, const EventsScreen()),
+          ),
+          ServiceItem(
+            label: 'Inventory',
+            icon: Icons.inventory_2_rounded,
+            gradient: [const Color(0xFF0284C7), const Color(0xFFC084FC)],
+            category: 'Operations',
+            onTap: () => _nav(context, const InventoryScreen()),
+          ),
+          ServiceItem(
+            label: 'Transport',
+            icon: Icons.directions_bus_rounded,
+            gradient: [const Color(0xFFEF4444), const Color(0xFFF87171)],
+            category: 'Operations',
+            onTap: () => _nav(context, const TransportScreen()),
+          ),
+          ServiceItem(
+            label: 'Library',
+            icon: Icons.local_library_rounded,
+            gradient: [const Color(0xFF3B82F6), const Color(0xFF60A5FA)],
+            category: 'Operations',
+            onTap: () => _nav(context, const LibraryScreen()),
+          ),
+          ServiceItem(
+            label: 'Reports',
+            icon: Icons.assessment_rounded,
+            gradient: [const Color(0xFF0EA5E9), const Color(0xFF38BDF8)],
+            category: 'Academic',
+            onTap: () => _nav(
+              context,
+              StudentReportsScreen(
+                className: '',
+                user: widget.user,
+              ),
+            ),
+          ),
+          ServiceItem(
+            label: 'Settings',
+            icon: Icons.settings_rounded,
+            gradient: [const Color(0xFF64748B), const Color(0xFF94A3B8)],
+            category: 'General',
+            onTap: () => _nav(context, const SettingsScreen()),
+          ),
         ];
       case UserRole.teacher:
         return [
-          ServiceItem(label: 'Attendance', icon: Icons.how_to_reg_rounded, gradient: [const Color(0xFF6366F1), const Color(0xFF8B5CF6)], category: 'Daily', onTap: () => _nav(context, const AttendanceScreen())),
-          ServiceItem(label: 'Students', icon: Icons.people_alt_rounded, gradient: [const Color(0xFF8B5CF6), const Color(0xFFA78BFA)], category: 'Management', onTap: () => _nav(context, const ManageUsersScreen(isTeacherView: true))),
-          ServiceItem(label: 'Classes', icon: Icons.school_rounded, gradient: [const Color(0xFF10B981), const Color(0xFF34D399)], category: 'Management', onTap: () => _nav(context, const ClassesScreen())),
-          ServiceItem(label: 'Marks', icon: Icons.grade_rounded, gradient: [const Color(0xFFF59E0B), const Color(0xFFFBBF24)], category: 'Academic', onTap: () => _nav(context, const MarksScreen())),
-          ServiceItem(label: 'Schedule', icon: Icons.event_note_rounded, gradient: [const Color(0xFFEC4899), Color(0xFFF472B6)], category: 'Academic', onTap: () => _nav(context, TimetableScreen(className: widget.user?.className))),
-          ServiceItem(label: 'Lessons', icon: Icons.book_rounded, gradient: [const Color(0xFF14B8A6), Color(0xFF2DD4BF)], category: 'Academic', onTap: () => _nav(context, const LessonsScreen())),
-          ServiceItem(label: 'Library', icon: Icons.local_library_rounded, gradient: [const Color(0xFF3B82F6), const Color(0xFF60A5FA)], category: 'Operations', onTap: () => _nav(context, const LibraryScreen())),
-          ServiceItem(label: 'Transport', icon: Icons.directions_bus_rounded, gradient: [const Color(0xFFEF4444), Color(0xFFF87171)], category: 'Operations', onTap: () => _nav(context, const TransportScreen())),
-          ServiceItem(label: 'Settings', icon: Icons.settings_rounded, gradient: [const Color(0xFF64748B), const Color(0xFF94A3B8)], category: 'General', onTap: () => _nav(context, const SettingsScreen())),
+          ServiceItem(
+            label: 'Attendance',
+            icon: Icons.how_to_reg_rounded,
+            gradient: [const Color(0xFF0EA5E9), const Color(0xFF0284C7)],
+            category: 'Daily',
+            onTap: () => _nav(context, AttendanceScreen(user: widget.user)),
+          ),
+          ServiceItem(
+            label: 'Students',
+            icon: Icons.people_alt_rounded,
+            gradient: [const Color(0xFF0284C7), const Color(0xFF60A5FA)],
+            category: 'Management',
+            onTap: () => _nav(
+              context,
+              const ManageUsersScreen(viewMode: ManageUsersViewMode.teacher),
+            ),
+          ),
+          ServiceItem(
+            label: 'Classes',
+            icon: Icons.school_rounded,
+            gradient: [const Color(0xFF10B981), const Color(0xFF34D399)],
+            category: 'Management',
+            onTap: () => _nav(context, const ClassesScreen()),
+          ),
+          ServiceItem(
+            label: 'Reports',
+            icon: Icons.assessment_rounded,
+            gradient: [const Color(0xFF0EA5E9), const Color(0xFF38BDF8)],
+            category: 'Academic',
+            onTap: () => _nav(
+              context,
+              StudentReportsScreen(
+                className: widget.user?.className ?? '',
+                user: widget.user,
+              ),
+            ),
+          ),
+          ServiceItem(
+            label: 'Schedule',
+            icon: Icons.event_note_rounded,
+            gradient: [const Color(0xFFEC4899), Color(0xFFF472B6)],
+            category: 'Academic',
+            onTap: () => _nav(
+              context,
+              TimetableScreen(className: widget.user?.className),
+            ),
+          ),
+          ServiceItem(
+            label: 'Exams',
+            icon: Icons.assignment_rounded,
+            gradient: [const Color(0xFF2563EB), const Color(0xFF1D4ED8)],
+            category: 'Academic',
+            onTap: () => _nav(context, ExamScreen(teacher: widget.user!)),
+          ),
+          ServiceItem(
+            label: 'Lessons',
+            icon: Icons.book_rounded,
+            gradient: [const Color(0xFF14B8A6), Color(0xFF2DD4BF)],
+            category: 'Academic',
+            onTap: () => _nav(context, const LessonsScreen()),
+          ),
+          ServiceItem(
+            label: 'Library',
+            icon: Icons.local_library_rounded,
+            gradient: [const Color(0xFF3B82F6), const Color(0xFF60A5FA)],
+            category: 'Operations',
+            onTap: () => _nav(context, const LibraryScreen()),
+          ),
+          ServiceItem(
+            label: 'Transport',
+            icon: Icons.directions_bus_rounded,
+            gradient: [const Color(0xFFEF4444), Color(0xFFF87171)],
+            category: 'Operations',
+            onTap: () => _nav(context, const TransportScreen()),
+          ),
+          ServiceItem(
+            label: 'Settings',
+            icon: Icons.settings_rounded,
+            gradient: [const Color(0xFF64748B), const Color(0xFF94A3B8)],
+            category: 'General',
+            onTap: () => _nav(context, const SettingsScreen()),
+          ),
         ];
       default:
         return [
-          ServiceItem(label: 'Result', icon: Icons.assessment_rounded, gradient: [const Color(0xFF10B981), const Color(0xFF34D399)], category: 'Academic', onTap: () => _nav(context, GradesScreen(studentId: widget.user?.id ?? ''))),
-          ServiceItem(label: 'Time', icon: Icons.schedule_rounded, gradient: [const Color(0xFFF59E0B), const Color(0xFFFBBF24)], category: 'Academic', onTap: () => _nav(context, TimetableScreen(className: widget.user?.className))),
-          ServiceItem(label: 'Task', icon: Icons.assignment_rounded, gradient: [const Color(0xFFEC4899), const Color(0xFFF472B6)], category: 'Academic', onTap: () => _nav(context, const HomeworkScreen())),
-          ServiceItem(label: 'Attendance', icon: Icons.calendar_today_rounded, gradient: [const Color(0xFF6366F1), const Color(0xFF8B5CF6)], category: 'Academic', onTap: () => _nav(context, StudentAttendanceScreen(studentId: widget.user?.id ?? '', studentName: widget.user?.name ?? ''))),
-          ServiceItem(label: 'Library', icon: Icons.local_library_rounded, gradient: [const Color(0xFF14B8A6), const Color(0xFF2DD4BF)], category: 'Operations', onTap: () => _nav(context, const LibraryScreen())),
-          ServiceItem(label: 'Fees', icon: Icons.monetization_on_rounded, gradient: [const Color(0xFFEF4444), const Color(0xFFF87171)], category: 'Operations', onTap: () => _nav(context, const FeesScreen())),
-          ServiceItem(label: 'Transport', icon: Icons.directions_bus_rounded, gradient: [const Color(0xFF3B82F6), const Color(0xFF60A5FA)], category: 'Operations', onTap: () => _nav(context, const TransportScreen())),
-          ServiceItem(label: 'Settings', icon: Icons.settings_rounded, gradient: [const Color(0xFF64748B), const Color(0xFF94A3B8)], category: 'General', onTap: () => _nav(context, const SettingsScreen())),
+          ServiceItem(
+            label: 'Report card',
+            icon: Icons.description_rounded,
+            gradient: [const Color(0xFF0EA5E9), const Color(0xFF38BDF8)],
+            category: 'Academic',
+            onTap: () => _nav(
+              context,
+              StudentReportsScreen(
+                className: widget.user?.className ?? '',
+                user: widget.user,
+              ),
+            ),
+          ),
+          ServiceItem(
+            label: 'Result',
+            icon: Icons.assessment_rounded,
+            gradient: [const Color(0xFF10B981), const Color(0xFF34D399)],
+            category: 'Academic',
+            onTap: () =>
+                _nav(context, GradesScreen(studentId: widget.user?.id ?? '')),
+          ),
+          ServiceItem(
+            label: 'Time',
+            icon: Icons.schedule_rounded,
+            gradient: [const Color(0xFFF59E0B), const Color(0xFFFBBF24)],
+            category: 'Academic',
+            onTap: () => _nav(
+              context,
+              TimetableScreen(className: widget.user?.className),
+            ),
+          ),
+          ServiceItem(
+            label: 'Task',
+            icon: Icons.assignment_rounded,
+            gradient: [const Color(0xFFEC4899), const Color(0xFFF472B6)],
+            category: 'Academic',
+            onTap: () => _nav(context, HomeworkScreen(teacher: widget.user)),
+          ),
+          ServiceItem(
+            label: 'Attendance',
+            icon: Icons.calendar_today_rounded,
+            gradient: [const Color(0xFF0EA5E9), const Color(0xFF0284C7)],
+            category: 'Academic',
+            onTap: () => _nav(
+              context,
+              StudentAttendanceScreen(
+                studentId: widget.user?.id ?? '',
+                studentName: widget.user?.name ?? '',
+              ),
+            ),
+          ),
+          ServiceItem(
+            label: 'Library',
+            icon: Icons.local_library_rounded,
+            gradient: [const Color(0xFF14B8A6), const Color(0xFF2DD4BF)],
+            category: 'Operations',
+            onTap: () => _nav(context, const LibraryScreen()),
+          ),
+          ServiceItem(
+            label: 'Fees',
+            icon: Icons.monetization_on_rounded,
+            gradient: [const Color(0xFFEF4444), const Color(0xFFF87171)],
+            category: 'Operations',
+            onTap: () => _nav(context, const FeesScreen()),
+          ),
+          ServiceItem(
+            label: 'Transport',
+            icon: Icons.directions_bus_rounded,
+            gradient: [const Color(0xFF3B82F6), const Color(0xFF60A5FA)],
+            category: 'Operations',
+            onTap: () => _nav(context, const TransportScreen()),
+          ),
+          ServiceItem(
+            label: 'Settings',
+            icon: Icons.settings_rounded,
+            gradient: [const Color(0xFF64748B), const Color(0xFF94A3B8)],
+            category: 'General',
+            onTap: () => _nav(context, const SettingsScreen()),
+          ),
         ];
     }
   }
@@ -115,8 +328,12 @@ class _AllServicesScreenState extends State<AllServicesScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final allServices = _getServices();
-    final filteredServices = allServices.where((s) => s.label.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-    
+    final filteredServices = allServices
+        .where(
+          (s) => s.label.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
+        .toList();
+
     final categories = filteredServices.map((s) => s.category).toSet().toList();
 
     return Scaffold(
@@ -125,25 +342,32 @@ class _AllServicesScreenState extends State<AllServicesScreen>
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverAppBar(
-            expandedHeight: 140,
+            expandedHeight: 160,
             floating: false,
             pinned: true,
             stretch: true,
-            backgroundColor: const Color(0xFF4338CA),
+            backgroundColor: const Color(0xFF1E293B),
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
-              title: const Text('All Services', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
-              centerTitle: true,
+              titlePadding: const EdgeInsets.fromLTRB(20, 0, 16, 16),
+              title: const Text(
+                'All Services',
+                style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 20),
+              ),
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
+                    colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)],
                   ),
                 ),
-                child: Center(
-                  child: Icon(Icons.apps_rounded, color: Color(0x1AFFFFFF), size: 120),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 24),
+                    child: Icon(Icons.apps_rounded, color: Color(0x14FFFFFF), size: 130),
+                  ),
                 ),
               ),
             ),
@@ -167,7 +391,11 @@ class _AllServicesScreenState extends State<AllServicesScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.search_off_rounded, size: 80, color: Colors.grey.withOpacity(0.3)),
+                    Icon(
+                      Icons.search_off_rounded,
+                      size: 80,
+                      color: Colors.grey.withValues(alpha: 0.3),
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'No matching services',
@@ -201,12 +429,15 @@ class _AllServicesScreenState extends State<AllServicesScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverGrid.count(
                   crossAxisCount: 3,
-                  childAspectRatio: 0.8,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.9,
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 14,
                   children: filteredServices
                       .where((s) => s.category == category)
-                      .map((service) => _ServiceCard(service: service, isDark: isDark))
+                      .map(
+                        (service) =>
+                            _ServiceCard(service: service, isDark: isDark),
+                      )
                       .toList(),
                 ),
               ),
@@ -226,54 +457,71 @@ class _ServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: service.onTap,
-              borderRadius: BorderRadius.circular(28),
-              child: Container(
-                width: double.infinity,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: service.onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF141E30) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : const Color(0xFFE8EDF5),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: service.gradient[0].withValues(alpha: isDark ? 0.08 : 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: service.gradient,
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: service.gradient[0].withOpacity(0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
+                      color: service.gradient[0].withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Icon(
-                  service.icon,
-                  color: Colors.white,
-                  size: 32,
+                child: Icon(service.icon, color: Colors.white, size: 26),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(
+                  service.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    letterSpacing: -0.1,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-        Text(
-          service.label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : const Color(0xFF1E293B),
-            letterSpacing: -0.2,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+      ),
     );
   }
 }

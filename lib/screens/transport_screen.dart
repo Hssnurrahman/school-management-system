@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/transport_route.dart';
 import '../services/database_service.dart';
+import '../widgets/app_bottom_sheet.dart';
+import '../widgets/confirm_delete_dialog.dart';
+import '../utils/app_snackbar.dart';
 
 class TransportScreen extends StatefulWidget {
   const TransportScreen({super.key});
@@ -21,11 +24,18 @@ class _TransportScreenState extends State<TransportScreen> {
 
   Future<void> _loadRoutes() async {
     setState(() => _isLoading = true);
-    final routes = await dbService.getRoutes();
-    setState(() {
-      _routes = routes;
-      _isLoading = false;
-    });
+    try {
+      final routes = await dbService.getRoutes();
+      if (!mounted) return;
+      setState(() {
+        _routes = routes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showErrorSnackBar(context, 'Failed to load: $e');
+    }
   }
 
   void _showAddRouteSheet() {
@@ -36,59 +46,52 @@ class _TransportScreenState extends State<TransportScreen> {
     final vehicleController = TextEditingController();
     final stopsController = TextEditingController();
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16, top: 20, left: 24, right: 24),
-        child: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.25), borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 20),
-                const Text('Add Transport Route', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 20),
-                TextFormField(controller: routeNameController, decoration: const InputDecoration(labelText: 'Route Name', prefixIcon: Icon(Icons.route_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-                const SizedBox(height: 14),
-                TextFormField(controller: driverNameController, decoration: const InputDecoration(labelText: 'Driver Name', prefixIcon: Icon(Icons.person_outline_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-                const SizedBox(height: 14),
-                TextFormField(controller: driverPhoneController, decoration: const InputDecoration(labelText: 'Driver Phone', prefixIcon: Icon(Icons.phone_rounded))),
-                const SizedBox(height: 14),
-                TextFormField(controller: vehicleController, decoration: const InputDecoration(labelText: 'Vehicle Number', prefixIcon: Icon(Icons.directions_bus_rounded))),
-                const SizedBox(height: 14),
-                TextFormField(controller: stopsController, decoration: const InputDecoration(labelText: 'Stops (comma separated)', prefixIcon: Icon(Icons.location_on_rounded)), maxLines: 2),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (formKey.currentState!.validate()) {
-                      final stops = stopsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-                      if (stops.isEmpty) stops.add('School');
-                      final route = TransportRoute(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        routeName: routeNameController.text,
-                        driverName: driverNameController.text,
-                        driverPhone: driverPhoneController.text.isEmpty ? 'N/A' : driverPhoneController.text,
-                        vehicleNumber: vehicleController.text.isEmpty ? 'N/A' : vehicleController.text,
-                        stops: stops,
-                      );
-                      await dbService.insertRoute(route);
-                      if (context.mounted) Navigator.pop(context);
-                      await _loadRoutes();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
-                  child: const Text('Add Route'),
-                ),
-                const SizedBox(height: 8),
-              ],
+      child: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(),
+            const SizedBox(height: 20),
+            const Text('Add Transport Route', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 20),
+            TextFormField(controller: routeNameController, decoration: const InputDecoration(labelText: 'Route Name', prefixIcon: Icon(Icons.route_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 14),
+            TextFormField(controller: driverNameController, decoration: const InputDecoration(labelText: 'Driver Name', prefixIcon: Icon(Icons.person_outline_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 14),
+            TextFormField(controller: driverPhoneController, decoration: const InputDecoration(labelText: 'Driver Phone', prefixIcon: Icon(Icons.phone_rounded))),
+            const SizedBox(height: 14),
+            TextFormField(controller: vehicleController, decoration: const InputDecoration(labelText: 'Vehicle Number', prefixIcon: Icon(Icons.directions_bus_rounded))),
+            const SizedBox(height: 14),
+            TextFormField(controller: stopsController, decoration: const InputDecoration(labelText: 'Stops (comma separated)', prefixIcon: Icon(Icons.location_on_rounded)), maxLines: 2),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  final stops = stopsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                  if (stops.isEmpty) stops.add('School');
+                  final route = TransportRoute(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    routeName: routeNameController.text,
+                    driverName: driverNameController.text,
+                    driverPhone: driverPhoneController.text.isEmpty ? 'N/A' : driverPhoneController.text,
+                    vehicleNumber: vehicleController.text.isEmpty ? 'N/A' : vehicleController.text,
+                    stops: stops,
+                  );
+                  final nav = Navigator.of(context);
+                  await dbService.insertRoute(route);
+                  if (context.mounted) nav.pop();
+                  await _loadRoutes();
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              child: const Text('Add Route'),
             ),
-          ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -112,7 +115,7 @@ class _TransportScreenState extends State<TransportScreen> {
               centerTitle: true,
               background: Container(
                 decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFDC2626), Color(0xFFEF4444)])),
-                child: Center(child: Icon(Icons.directions_bus_rounded, color: Colors.white.withOpacity(0.12), size: 120)),
+                child: Center(child: Icon(Icons.directions_bus_rounded, color: Colors.white.withValues(alpha: 0.12), size: 120)),
               ),
             ),
           ),
@@ -142,24 +145,14 @@ class _TransportScreenState extends State<TransportScreen> {
   }
 
   void _deleteRoute(TransportRoute route) {
-    showDialog(
+    showConfirmDeleteDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Route?'),
-        content: Text('Remove "${route.routeName}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              await dbService.deleteRoute(route.id);
-              if (context.mounted) Navigator.pop(context);
-              await _loadRoutes();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Route?',
+      message: 'Remove "${route.routeName}"?',
+      onConfirm: () async {
+        await dbService.deleteRoute(route.id);
+        await _loadRoutes();
+      },
     );
   }
 }
@@ -181,7 +174,7 @@ class _RouteCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141E30) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
@@ -189,10 +182,10 @@ class _RouteCard extends StatelessWidget {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.directions_bus_rounded, color: Color(0xFFEF4444), size: 22)),
+            leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.directions_bus_rounded, color: Color(0xFFEF4444), size: 22)),
             title: Text(route.routeName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             subtitle: Row(children: [
-              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)), child: Text(route.status, style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 10))),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)), child: Text(route.status, style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 10))),
               const SizedBox(width: 8),
               Text(route.vehicleNumber, style: TextStyle(color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
             ]),
@@ -202,7 +195,7 @@ class _RouteCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Divider(color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE8EDF5)),
+                    Divider(color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFE8EDF5)),
                     const SizedBox(height: 10),
                     _InfoRow(icon: Icons.person_rounded, label: 'Driver', value: route.driverName, isDark: isDark),
                     const SizedBox(height: 8),
@@ -215,7 +208,7 @@ class _RouteCard extends StatelessWidget {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Row(children: [
-                          Container(width: 8, height: 8, decoration: BoxDecoration(color: isLast ? const Color(0xFFEF4444) : const Color(0xFFEF4444).withOpacity(0.4), shape: BoxShape.circle)),
+                          Container(width: 8, height: 8, decoration: BoxDecoration(color: isLast ? const Color(0xFFEF4444) : const Color(0xFFEF4444).withValues(alpha: 0.4), shape: BoxShape.circle)),
                           const SizedBox(width: 10),
                           Text(entry.value, style: TextStyle(fontWeight: isLast ? FontWeight.w700 : FontWeight.w500, color: isLast ? null : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)), fontSize: 13)),
                         ]),
@@ -229,7 +222,7 @@ class _RouteCard extends StatelessWidget {
                           onTap: onDelete,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                            decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
                             child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.delete_outline_rounded, size: 14, color: Color(0xFFEF4444)), SizedBox(width: 5), Text('Delete', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w700, fontSize: 12))]),
                           ),
                         ),

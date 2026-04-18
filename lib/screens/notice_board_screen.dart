@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/notice_model.dart';
 import '../services/database_service.dart';
+import '../utils/app_snackbar.dart';
+import '../widgets/app_bottom_sheet.dart';
+import '../widgets/confirm_delete_dialog.dart';
 
 class NoticeBoardScreen extends StatefulWidget {
   const NoticeBoardScreen({super.key});
@@ -37,12 +40,19 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
 
   Future<void> _loadNotices() async {
     setState(() => _isLoading = true);
-    final notices = await dbService.getNotices();
-    setState(() {
-      _notices = notices;
-      _isLoading = false;
-    });
-    _animationController.forward(from: 0);
+    try {
+      final notices = await dbService.getNotices();
+      if (!mounted) return;
+      setState(() {
+        _notices = notices;
+        _isLoading = false;
+      });
+      _animationController.forward(from: 0);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showErrorSnackBar(context, 'Failed to load: $e');
+    }
   }
 
   @override
@@ -58,18 +68,15 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
     final contentController = TextEditingController();
     final authorController = TextEditingController();
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _BottomSheetContainer(
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SheetHandle(),
+      child: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(),
               const SizedBox(height: 20),
               const Text('Post New Notice', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
               const SizedBox(height: 20),
@@ -89,8 +96,9 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
                       date: DateTime.now(),
                       author: authorController.text,
                     );
+                    final nav = Navigator.of(context);
                     await dbService.insertNotice(notice);
-                    if (context.mounted) Navigator.pop(context);
+                    if (context.mounted) nav.pop();
                     await _loadNotices();
                   }
                 },
@@ -100,29 +108,18 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   void _showDeleteConfirmation(Notice notice) {
-    showDialog(
+    showConfirmDeleteDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Notice?'),
-        content: const Text('This announcement will be permanently deleted.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              await dbService.deleteNotice(notice.id);
-              if (context.mounted) Navigator.pop(context);
-              await _loadNotices();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Remove Notice?',
+      message: 'This announcement will be permanently deleted.',
+      onConfirm: () async {
+        await dbService.deleteNotice(notice.id);
+        await _loadNotices();
+      },
     );
   }
 
@@ -140,23 +137,55 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverAppBar(
-            expandedHeight: 140,
+            expandedHeight: 160,
             pinned: true,
-            backgroundColor: const Color(0xFF4F46E5),
+            stretch: true,
+            backgroundColor: const Color(0xFF0D9488),
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
-              title: const Text('Notice Board', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
               centerTitle: true,
+              titlePadding: const EdgeInsets.fromLTRB(56, 0, 56, 14),
+              title: const Text('Notice Board', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                    colors: [Color(0xFF0F766E), Color(0xFF0D9488), Color(0xFF2563EB)],
                   ),
                 ),
-                child: Center(
-                  child: Icon(Icons.campaign_rounded, color: Colors.white.withOpacity(0.12), size: 120),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 48, 24, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.campaign_rounded, color: Colors.white, size: 14),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '${_notices.length} notice${_notices.length == 1 ? '' : 's'}',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -184,6 +213,37 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
             ),
           if (_isLoading)
             const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+          else if (filtered.isEmpty)
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _isSearching ? Icons.search_off_rounded : Icons.campaign_outlined,
+                        size: 48, color: const Color(0xFF0D9488).withValues(alpha: 0.4),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      _isSearching ? 'No notices match your search' : 'No notices yet',
+                      style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w700, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _isSearching ? 'Try a different keyword' : 'Tap "+ Post Notice" to broadcast one',
+                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            )
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -209,7 +269,7 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddNoticeSheet,
-        backgroundColor: const Color(0xFF4F46E5),
+        backgroundColor: const Color(0xFF0D9488),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_comment_rounded),
         label: const Text('Post Notice', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -225,48 +285,95 @@ class _NoticeCard extends StatelessWidget {
 
   const _NoticeCard({required this.notice, required this.isDark, required this.onDelete});
 
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    const accentColor = Color(0xFF0D9488);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141E30) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
-        child: Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: const Color(0xFF4F46E5).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-              child: const Icon(Icons.campaign_rounded, color: Color(0xFF4F46E5), size: 22),
-            ),
-            title: Text(notice.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-            subtitle: Text(
-              '${notice.date.day}/${notice.date.month}/${notice.date.year} · ${notice.author}',
-              style: TextStyle(color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
-            ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Divider(color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE8EDF5)),
-                    const SizedBox(height: 10),
-                    Text(notice.content, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), height: 1.6, fontSize: 14, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+              Container(
+                width: 4,
+                decoration: const BoxDecoration(
+                  color: accentColor,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    bottomLeft: Radius.circular(18),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    tilePadding: const EdgeInsets.fromLTRB(14, 10, 18, 10),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.campaign_rounded, color: accentColor, size: 22),
+                    ),
+                    title: Text(notice.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    subtitle: Row(
                       children: [
-                        _ActionButton(icon: Icons.delete_outline_rounded, label: 'Delete', onTap: onDelete, isDestructive: true),
+                        Icon(Icons.calendar_today_rounded, size: 10,
+                          color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDate(notice.date),
+                          style: TextStyle(color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.person_outline_rounded, size: 10,
+                          color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            notice.author,
+                            style: TextStyle(color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
-                  ],
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Divider(color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFE8EDF5)),
+                            const SizedBox(height: 10),
+                            Text(notice.content, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), height: 1.6, fontSize: 14, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                _ActionButton(icon: Icons.delete_outline_rounded, label: 'Delete', onTap: onDelete, isDestructive: true),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -292,7 +399,7 @@ class _ActionButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -306,33 +413,3 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _BottomSheetContainer extends StatelessWidget {
-  final Widget child;
-  const _BottomSheetContainer({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16, top: 20, left: 24, right: 24),
-      child: SingleChildScrollView(child: child),
-    );
-  }
-}
-
-class _SheetHandle extends StatelessWidget {
-  const _SheetHandle();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 36, height: 4,
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.15) : Colors.grey.withOpacity(0.25),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
-}

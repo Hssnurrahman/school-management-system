@@ -52,7 +52,7 @@ class FinanceSummaryScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141E30) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
       ),
       child: Column(
         children: [
@@ -102,13 +102,13 @@ class FinanceSummaryScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF141E30) : Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+            border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: (entry.value['color'] as Color).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: (entry.value['color'] as Color).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                 child: Icon(entry.value['icon'] as IconData, color: entry.value['color'] as Color, size: 20),
               ),
               const SizedBox(width: 14),
@@ -128,7 +128,7 @@ class FinanceSummaryScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141E30) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
       ),
       child: Column(
         children: [
@@ -145,7 +145,7 @@ class FinanceSummaryScreen extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 12,
-              backgroundColor: Colors.indigo.withOpacity(0.1),
+              backgroundColor: Colors.indigo.withValues(alpha: 0.1),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.indigo),
             ),
           ),

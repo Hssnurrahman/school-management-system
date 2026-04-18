@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/fee_model.dart';
 import '../services/database_service.dart';
+import '../utils/app_snackbar.dart';
+import '../widgets/app_bottom_sheet.dart';
 import 'finance_summary_screen.dart';
 
 class FeesScreen extends StatefulWidget {
@@ -29,12 +31,19 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
 
   Future<void> _loadFees() async {
     setState(() => _isLoading = true);
-    final fees = await dbService.getFees();
-    setState(() {
-      _fees = fees;
-      _isLoading = false;
-    });
-    _animationController.forward(from: 0);
+    try {
+      final fees = await dbService.getFees();
+      if (!mounted) return;
+      setState(() {
+        _fees = fees;
+        _isLoading = false;
+      });
+      _animationController.forward(from: 0);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showErrorSnackBar(context, 'Failed to load: $e');
+    }
   }
 
   @override
@@ -89,7 +98,7 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text('Total Outstanding', style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text('Total Outstanding', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 6),
                         FittedBox(child: Text('\$${totalPending.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1))),
                         const SizedBox(height: 14),
@@ -115,7 +124,7 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF141E30) : Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+                  border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
                 ),
                 child: Row(
                   children: ['All', 'Pending', 'Paid'].map((tab) {
@@ -171,7 +180,7 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
   Widget _buildMiniStat(String label, String val, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.25))),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.25))),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -187,24 +196,19 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
 
   void _showPaymentSheet(BuildContext context, Fee fee) {
     final refController = TextEditingController();
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16, top: 20, left: 24, right: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.25), borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 20),
-            const Text('Process Payment', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SheetHandle(),
+          const SizedBox(height: 20),
+          const Text('Process Payment', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(color: const Color(0xFF14B8A6).withOpacity(0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF14B8A6).withOpacity(0.2))),
+              decoration: BoxDecoration(color: const Color(0xFF14B8A6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF14B8A6).withValues(alpha: 0.2))),
               child: Row(
                 children: [
                   const Icon(Icons.receipt_long_rounded, color: Color(0xFF14B8A6), size: 28),
@@ -227,13 +231,23 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
             ElevatedButton(
               onPressed: () async {
                 final updated = fee.copyWith(isPaid: true);
+                final messenger = ScaffoldMessenger.of(context);
                 await dbService.updateFee(updated);
-                if (context.mounted) Navigator.pop(context);
+                if (!context.mounted) return;
+                Navigator.pop(context);
                 await _loadFees();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Payment marked as successful!'), behavior: SnackBarBehavior.floating),
-                  );
+                  messenger.showSnackBar(SnackBar(
+                    content: Row(children: [
+                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                      const SizedBox(width: 10),
+                      const Expanded(child: Text('Payment marked as successful!')),
+                    ]),
+                    backgroundColor: const Color(0xFF10B981),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    margin: const EdgeInsets.all(16),
+                    behavior: SnackBarBehavior.floating,
+                  ));
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF14B8A6)),
@@ -242,8 +256,7 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
             const SizedBox(height: 8),
           ],
         ),
-      ),
-    );
+      );
   }
 
   void _showAddFeeSheet() {
@@ -252,22 +265,16 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
     final studentController = TextEditingController();
     FeeCategory selectedCategory = FeeCategory.tuition;
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
-          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16, top: 20, left: 24, right: 24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.25), borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 20),
-                const Text('Create New Invoice', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+      child: StatefulBuilder(
+        builder: (context, setSheetState) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(),
+            const SizedBox(height: 20),
+            const Text('Create New Invoice', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 20),
                 TextField(controller: studentController, decoration: const InputDecoration(labelText: 'Student Name', prefixIcon: Icon(Icons.person_outline_rounded))),
                 const SizedBox(height: 14),
@@ -280,7 +287,7 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
                     Expanded(
                       flex: 3,
                       child: DropdownButtonFormField<FeeCategory>(
-                        value: selectedCategory,
+                        initialValue: selectedCategory,
                         decoration: const InputDecoration(labelText: 'Category'),
                         items: FeeCategory.values.map((cat) => DropdownMenuItem(value: cat, child: Text(cat.name.toUpperCase(), style: const TextStyle(fontSize: 12)))).toList(),
                         onChanged: (v) => setSheetState(() => selectedCategory = v!),
@@ -313,9 +320,7 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
-        ),
-      ),
-    );
+        );
   }
 }
 
@@ -345,13 +350,13 @@ class _FeeCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141E30) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: accentColor.withOpacity(0.1), borderRadius: BorderRadius.circular(14)), child: Icon(_getCategoryIcon(), color: accentColor, size: 22)),
+              Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)), child: Icon(_getCategoryIcon(), color: accentColor, size: 22)),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -370,7 +375,7 @@ class _FeeCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: fee.isPaid ? const Color(0xFF10B981).withOpacity(0.1) : const Color(0xFFEF4444).withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(color: fee.isPaid ? const Color(0xFF10B981).withValues(alpha: 0.1) : const Color(0xFFEF4444).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
                     child: Text(fee.isPaid ? 'PAID' : 'PENDING', style: TextStyle(color: fee.isPaid ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontWeight: FontWeight.w800, fontSize: 10)),
                   ),
                 ],
@@ -378,7 +383,7 @@ class _FeeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Divider(color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE8EDF5)),
+          Divider(color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFE8EDF5)),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

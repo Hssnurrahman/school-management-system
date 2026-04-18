@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/event_model.dart';
 import '../services/database_service.dart';
+import '../utils/app_snackbar.dart';
+import '../widgets/app_bottom_sheet.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -30,12 +32,19 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
 
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
-    final events = await dbService.getEvents();
-    setState(() {
-      _events = events;
-      _isLoading = false;
-    });
-    _animationController.forward(from: 0);
+    try {
+      final events = await dbService.getEvents();
+      if (!mounted) return;
+      setState(() {
+        _events = events;
+        _isLoading = false;
+      });
+      _animationController.forward(from: 0);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showErrorSnackBar(context, 'Failed to load: $e');
+    }
   }
 
   @override
@@ -50,7 +59,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       case 'sports': return const Color(0xFF10B981);
       case 'academic': return const Color(0xFF3B82F6);
       case 'cultural': return const Color(0xFFF59E0B);
-      default: return const Color(0xFF8B5CF6);
+      default: return const Color(0xFF0284C7);
     }
   }
 
@@ -70,55 +79,48 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
     final locationController = TextEditingController();
     final categoryController = TextEditingController();
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16, top: 20, left: 24, right: 24),
-        child: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.25), borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 20),
-                const Text('Create New Event', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 20),
-                TextFormField(controller: titleController, decoration: const InputDecoration(labelText: 'Event Title', prefixIcon: Icon(Icons.event_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-                const SizedBox(height: 14),
-                TextFormField(controller: descController, maxLines: 3, decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true, prefixIcon: Icon(Icons.description_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-                const SizedBox(height: 14),
-                TextFormField(controller: locationController, decoration: const InputDecoration(labelText: 'Location', prefixIcon: Icon(Icons.location_on_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-                const SizedBox(height: 14),
-                TextFormField(controller: categoryController, decoration: const InputDecoration(labelText: 'Category (Sports/Academic/Cultural)', prefixIcon: Icon(Icons.category_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (formKey.currentState!.validate()) {
-                      final event = Event(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: titleController.text,
-                        description: descController.text,
-                        startDate: DateTime.now().add(const Duration(days: 1)),
-                        location: locationController.text,
-                        category: categoryController.text,
-                      );
-                      await dbService.insertEvent(event);
-                      if (context.mounted) Navigator.pop(context);
-                      await _loadEvents();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED)),
-                  child: const Text('Publish Event'),
-                ),
-                const SizedBox(height: 8),
-              ],
+      child: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(),
+            const SizedBox(height: 20),
+            const Text('Create New Event', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 20),
+            TextFormField(controller: titleController, decoration: const InputDecoration(labelText: 'Event Title', prefixIcon: Icon(Icons.event_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 14),
+            TextFormField(controller: descController, maxLines: 3, decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true, prefixIcon: Icon(Icons.description_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 14),
+            TextFormField(controller: locationController, decoration: const InputDecoration(labelText: 'Location', prefixIcon: Icon(Icons.location_on_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 14),
+            TextFormField(controller: categoryController, decoration: const InputDecoration(labelText: 'Category (Sports/Academic/Cultural)', prefixIcon: Icon(Icons.category_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  final event = Event(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    title: titleController.text,
+                    description: descController.text,
+                    startDate: DateTime.now().add(const Duration(days: 1)),
+                    location: locationController.text,
+                    category: categoryController.text,
+                  );
+                  final nav = Navigator.of(context);
+                  await dbService.insertEvent(event);
+                  if (context.mounted) nav.pop();
+                  await _loadEvents();
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+              child: const Text('Publish Event'),
             ),
-          ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -140,14 +142,14 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
           SliverAppBar(
             expandedHeight: 140,
             pinned: true,
-            backgroundColor: const Color(0xFF7C3AED),
+            backgroundColor: const Color(0xFF2563EB),
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
               title: const Text('Events', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
               centerTitle: true,
               background: Container(
-                decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)])),
-                child: Center(child: Icon(Icons.event_rounded, color: Colors.white.withOpacity(0.12), size: 120)),
+                decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF2563EB), Color(0xFF0284C7)])),
+                child: Center(child: Icon(Icons.event_rounded, color: Colors.white.withValues(alpha: 0.12), size: 120)),
               ),
             ),
             actions: [
@@ -199,7 +201,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddEventSheet,
-        backgroundColor: const Color(0xFF7C3AED),
+        backgroundColor: const Color(0xFF2563EB),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Event', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -224,7 +226,7 @@ class _EventCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141E30) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
@@ -232,21 +234,21 @@ class _EventCard extends StatelessWidget {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: categoryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(categoryIcon, color: categoryColor, size: 22)),
+            leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: categoryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: Icon(categoryIcon, color: categoryColor, size: 22)),
             title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             subtitle: Row(children: [
               Icon(Icons.calendar_today_rounded, size: 11, color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)),
               const SizedBox(width: 4),
               Text('${event.startDate.day}/${event.startDate.month} · ${event.location}', style: TextStyle(color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
             ]),
-            trailing: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: categoryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Text(event.category, style: TextStyle(color: categoryColor, fontWeight: FontWeight.w700, fontSize: 10))),
+            trailing: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: categoryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Text(event.category, style: TextStyle(color: categoryColor, fontWeight: FontWeight.w700, fontSize: 10))),
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Divider(color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE8EDF5)),
+                    Divider(color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFE8EDF5)),
                     const SizedBox(height: 10),
                     Text(event.description, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), height: 1.6, fontSize: 14, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 16),
@@ -257,7 +259,7 @@ class _EventCard extends StatelessWidget {
                           onTap: onDelete,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                            decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
                             child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.delete_outline_rounded, size: 14, color: Color(0xFFEF4444)), SizedBox(width: 5), Text('Delete', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w700, fontSize: 12))]),
                           ),
                         ),

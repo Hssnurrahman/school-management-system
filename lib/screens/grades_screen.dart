@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/grade_model.dart';
 import '../services/database_service.dart';
+import '../utils/app_snackbar.dart';
 
 class GradesScreen extends StatefulWidget {
   final String studentId;
@@ -22,11 +23,18 @@ class _GradesScreenState extends State<GradesScreen> {
 
   Future<void> _loadGrades() async {
     setState(() => _isLoading = true);
-    final grades = await dbService.getGradesForStudent(widget.studentId);
-    setState(() {
-      _grades = grades;
-      _isLoading = false;
-    });
+    try {
+      final grades = await dbService.getGradesForStudent(widget.studentId);
+      if (!mounted) return;
+      setState(() {
+        _grades = grades;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showErrorSnackBar(context, 'Failed to load: $e');
+    }
   }
 
   double _computeGpa() {
@@ -38,12 +46,12 @@ class _GradesScreenState extends State<GradesScreen> {
         final score = double.tryParse(parts[0]) ?? 0;
         final max = double.tryParse(parts[1]) ?? 100;
         final pct = score / max;
-        if (pct >= 0.9) total += 4.0;
-        else if (pct >= 0.8) total += 3.7;
-        else if (pct >= 0.7) total += 3.3;
-        else if (pct >= 0.6) total += 3.0;
-        else if (pct >= 0.5) total += 2.0;
-        else total += 0.0;
+        if (pct >= 0.9) { total += 4.0; }
+        else if (pct >= 0.8) { total += 3.7; }
+        else if (pct >= 0.7) { total += 3.3; }
+        else if (pct >= 0.6) { total += 3.0; }
+        else if (pct >= 0.5) { total += 2.0; }
+        else { total += 0.0; }
       }
     }
     return total / _grades.length;
@@ -85,7 +93,7 @@ class _GradesScreenState extends State<GradesScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text('Overall GPA', style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13, fontWeight: FontWeight.w600)),
+                              Text('Overall GPA', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13, fontWeight: FontWeight.w600)),
                               const SizedBox(height: 4),
                               Text(gpa.toStringAsFixed(2), style: const TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900, letterSpacing: -1)),
                               const Text('out of 4.0', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
@@ -94,7 +102,7 @@ class _GradesScreenState extends State<GradesScreen> {
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.3))),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.3))),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -119,7 +127,7 @@ class _GradesScreenState extends State<GradesScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.grade_outlined, size: 64, color: Colors.grey.withOpacity(0.4)),
+                    Icon(Icons.grade_outlined, size: 64, color: Colors.grey.withValues(alpha: 0.4)),
                     const SizedBox(height: 16),
                     const Text('No grades available yet', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
                   ],
@@ -132,11 +140,11 @@ class _GradesScreenState extends State<GradesScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                 child: Row(
                   children: [
-                    _buildStatCard('${_grades.length}', 'Subjects', const Color(0xFF6366F1), isDark),
+                    _buildStatCard('${_grades.length}', 'Subjects', const Color(0xFF0EA5E9), isDark),
                     const SizedBox(width: 10),
                     _buildStatCard('${_countGrade('A')}', 'A Grades', const Color(0xFF10B981), isDark),
                     const SizedBox(width: 10),
-                    _buildStatCard('${_countGrade('B')}', 'B Grades', const Color(0xFF8B5CF6), isDark),
+                    _buildStatCard('${_countGrade('B')}', 'B Grades', const Color(0xFF0284C7), isDark),
                   ],
                 ),
               ),
@@ -164,7 +172,7 @@ class _GradesScreenState extends State<GradesScreen> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF141E30) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+          border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
         ),
         child: Column(
           children: [
@@ -210,13 +218,13 @@ class _GradeCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141E30) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
       ),
       child: Row(
         children: [
           Container(
             width: 52, height: 52,
-            decoration: BoxDecoration(color: gradeColor.withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: gradeColor.withOpacity(0.25))),
+            decoration: BoxDecoration(color: gradeColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: gradeColor.withValues(alpha: 0.25))),
             child: Center(child: Text(grade.grade, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: gradeColor))),
           ),
           const SizedBox(width: 14),
@@ -230,7 +238,7 @@ class _GradeCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(value: _getPercent(), backgroundColor: gradeColor.withOpacity(0.1), valueColor: AlwaysStoppedAnimation<Color>(gradeColor), minHeight: 4),
+                  child: LinearProgressIndicator(value: _getPercent(), backgroundColor: gradeColor.withValues(alpha: 0.1), valueColor: AlwaysStoppedAnimation<Color>(gradeColor), minHeight: 4),
                 ),
               ],
             ),

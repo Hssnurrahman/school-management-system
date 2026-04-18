@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/lesson_model.dart';
 import '../services/database_service.dart';
+import '../utils/app_snackbar.dart';
+import '../widgets/app_bottom_sheet.dart';
 
 class LessonsScreen extends StatefulWidget {
   const LessonsScreen({super.key});
@@ -21,16 +23,23 @@ class _LessonsScreenState extends State<LessonsScreen> {
 
   Future<void> _loadLessons() async {
     setState(() => _isLoading = true);
-    final lessons = await dbService.getLessons();
-    setState(() {
-      _lessons = lessons;
-      _isLoading = false;
-    });
+    try {
+      final lessons = await dbService.getLessons();
+      if (!mounted) return;
+      setState(() {
+        _lessons = lessons;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showErrorSnackBar(context, 'Failed to load: $e');
+    }
   }
 
   Color _subjectColor(String subject) {
     switch (subject.toLowerCase()) {
-      case 'mathematics': return const Color(0xFF6366F1);
+      case 'mathematics': return const Color(0xFF0EA5E9);
       case 'science': return const Color(0xFF10B981);
       case 'history': return const Color(0xFFF59E0B);
       default: return const Color(0xFF3B82F6);
@@ -44,56 +53,49 @@ class _LessonsScreenState extends State<LessonsScreen> {
     final subjectController = TextEditingController();
     final classController = TextEditingController();
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16, top: 20, left: 24, right: 24),
-        child: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.25), borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 20),
-                const Text('New Lesson', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 20),
-                TextFormField(controller: titleController, decoration: const InputDecoration(labelText: 'Lesson Title', prefixIcon: Icon(Icons.title_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-                const SizedBox(height: 14),
-                TextFormField(controller: descController, maxLines: 3, decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true, prefixIcon: Icon(Icons.description_rounded))),
-                const SizedBox(height: 14),
-                TextFormField(controller: subjectController, decoration: const InputDecoration(labelText: 'Subject', prefixIcon: Icon(Icons.book_rounded))),
-                const SizedBox(height: 14),
-                TextFormField(controller: classController, decoration: const InputDecoration(labelText: 'Class', prefixIcon: Icon(Icons.school_rounded))),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (formKey.currentState!.validate()) {
-                      final lesson = Lesson(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: titleController.text,
-                        description: descController.text,
-                        subject: subjectController.text.isEmpty ? 'General' : subjectController.text,
-                        className: classController.text.isEmpty ? 'All Classes' : classController.text,
-                        teacherName: 'Current Teacher',
-                        date: DateTime.now().toIso8601String().split('T')[0],
-                      );
-                      await dbService.insertLesson(lesson);
-                      if (context.mounted) Navigator.pop(context);
-                      await _loadLessons();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF14B8A6)),
-                  child: const Text('Add Lesson'),
-                ),
-                const SizedBox(height: 8),
-              ],
+      child: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(),
+            const SizedBox(height: 20),
+            const Text('New Lesson', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 20),
+            TextFormField(controller: titleController, decoration: const InputDecoration(labelText: 'Lesson Title', prefixIcon: Icon(Icons.title_rounded)), validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+            const SizedBox(height: 14),
+            TextFormField(controller: descController, maxLines: 3, decoration: const InputDecoration(labelText: 'Description', alignLabelWithHint: true, prefixIcon: Icon(Icons.description_rounded))),
+            const SizedBox(height: 14),
+            TextFormField(controller: subjectController, decoration: const InputDecoration(labelText: 'Subject', prefixIcon: Icon(Icons.book_rounded))),
+            const SizedBox(height: 14),
+            TextFormField(controller: classController, decoration: const InputDecoration(labelText: 'Class', prefixIcon: Icon(Icons.school_rounded))),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  final lesson = Lesson(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    title: titleController.text,
+                    description: descController.text,
+                    subject: subjectController.text.isEmpty ? 'General' : subjectController.text,
+                    className: classController.text.isEmpty ? 'All Classes' : classController.text,
+                    teacherName: 'Current Teacher',
+                    date: DateTime.now(),
+                  );
+                  final nav = Navigator.of(context);
+                  await dbService.insertLesson(lesson);
+                  if (context.mounted) nav.pop();
+                  await _loadLessons();
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF14B8A6)),
+              child: const Text('Add Lesson'),
             ),
-          ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -117,7 +119,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
               centerTitle: true,
               background: Container(
                 decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0D9488), Color(0xFF14B8A6)])),
-                child: Center(child: Icon(Icons.menu_book_rounded, color: Colors.white.withOpacity(0.12), size: 120)),
+                child: Center(child: Icon(Icons.menu_book_rounded, color: Colors.white.withValues(alpha: 0.12), size: 120)),
               ),
             ),
           ),
@@ -156,8 +158,9 @@ class _LessonsScreenState extends State<LessonsScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
+              final nav = Navigator.of(context);
               await dbService.deleteLesson(lesson.id);
-              if (context.mounted) Navigator.pop(context);
+              if (context.mounted) nav.pop();
               await _loadLessons();
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -185,14 +188,14 @@ class _LessonCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141E30) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.menu_book_rounded, color: color, size: 22)),
+              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.menu_book_rounded, color: color, size: 22)),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -201,26 +204,29 @@ class _LessonCard extends StatelessWidget {
                     Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                     const SizedBox(height: 2),
                     Row(children: [
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)), child: Text(lesson.subject, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 10))),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)), child: Text(lesson.subject, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 10))),
                       const SizedBox(width: 6),
                       Text(lesson.className, style: TextStyle(color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
                     ]),
                   ],
                 ),
               ),
-              GestureDetector(onTap: onDelete, child: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.08), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16))),
+              GestureDetector(onTap: onDelete, child: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16))),
             ],
           ),
           const SizedBox(height: 12),
           Text(lesson.description, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), height: 1.5, fontSize: 13, fontWeight: FontWeight.w500)),
           const SizedBox(height: 12),
-          Divider(color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE8EDF5)),
+          Divider(color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFE8EDF5)),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(children: [Icon(Icons.person_outline_rounded, size: 14, color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)), const SizedBox(width: 4), Text(lesson.teacherName, style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontWeight: FontWeight.w500))]),
-              Row(children: [Icon(Icons.calendar_today_rounded, size: 14, color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)), const SizedBox(width: 4), Text(lesson.date, style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontWeight: FontWeight.w500))]),
+              Row(children: [Icon(Icons.calendar_today_rounded, size: 14, color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)), const SizedBox(width: 4), Text(
+                '${lesson.date.year}-${lesson.date.month.toString().padLeft(2, '0')}-${lesson.date.day.toString().padLeft(2, '0')}',
+                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+              )]),
             ],
           ),
         ],

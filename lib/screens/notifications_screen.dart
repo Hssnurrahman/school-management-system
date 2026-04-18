@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/notification_model.dart';
 import '../services/database_service.dart';
+import '../utils/app_snackbar.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -21,11 +22,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _loadNotifications() async {
     setState(() => _isLoading = true);
-    final notifications = await dbService.getNotifications();
-    setState(() {
-      _notifications = notifications;
-      _isLoading = false;
-    });
+    try {
+      final notifications = await dbService.getNotifications();
+      if (!mounted) return;
+      setState(() {
+        _notifications = notifications;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showErrorSnackBar(context, 'Failed to load: $e');
+    }
   }
 
   IconData _getIcon(NotificationType type) {
@@ -43,7 +51,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case NotificationType.approval: return const Color(0xFF3B82F6);
       case NotificationType.stock: return const Color(0xFFF59E0B);
       case NotificationType.finance: return const Color(0xFF10B981);
-      case NotificationType.message: return const Color(0xFF8B5CF6);
+      case NotificationType.message: return const Color(0xFF0284C7);
       case NotificationType.system: return const Color(0xFF64748B);
     }
   }
@@ -74,7 +82,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               centerTitle: true,
               background: Container(
                 decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0EA5E9), Color(0xFF3B82F6)])),
-                child: Center(child: Icon(Icons.notifications_rounded, color: Colors.white.withOpacity(0.12), size: 120)),
+                child: Center(child: Icon(Icons.notifications_rounded, color: Colors.white.withValues(alpha: 0.12), size: 120)),
               ),
             ),
             actions: [
@@ -94,7 +102,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.2))),
+                  decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.2))),
                   child: Row(children: [
                     Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF3B82F6), shape: BoxShape.circle)),
                     const SizedBox(width: 10),
@@ -153,14 +161,14 @@ class _NotificationCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: notification.isRead ? (isDark ? const Color(0xFF141E30) : Colors.white) : (isDark ? color.withOpacity(0.08) : color.withOpacity(0.04)),
+          color: notification.isRead ? (isDark ? const Color(0xFF141E30) : Colors.white) : (isDark ? color.withValues(alpha: 0.08) : color.withValues(alpha: 0.04)),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: notification.isRead ? (isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE8EDF5)) : color.withOpacity(0.2)),
+          border: Border.all(color: notification.isRead ? (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE8EDF5)) : color.withValues(alpha: 0.2)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 20)),
+            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 20)),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
