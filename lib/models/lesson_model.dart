@@ -5,7 +5,7 @@ class Lesson {
   final String subject;
   final String className;
   final String teacherName;
-  final String date;
+  final DateTime date;
   final String? attachmentUrl;
 
   Lesson({
@@ -26,7 +26,7 @@ class Lesson {
         'subject': subject,
         'className': className,
         'teacherName': teacherName,
-        'date': date,
+        'date': date.toIso8601String(),
         'attachmentUrl': attachmentUrl,
       };
 
@@ -37,7 +37,7 @@ class Lesson {
         subject: json['subject'],
         className: json['className'],
         teacherName: json['teacherName'],
-        date: json['date'],
+        date: DateTime.parse(json['date']),
         attachmentUrl: json['attachmentUrl'],
       );
 }

@@ -5,7 +5,7 @@ class LibraryBook {
   final String isbn;
   final String category;
   final bool isAvailable;
-  final String? dueDate;
+  final DateTime? dueDate;
 
   LibraryBook({
     required this.id,
@@ -24,7 +24,7 @@ class LibraryBook {
     String? isbn,
     String? category,
     bool? isAvailable,
-    String? dueDate,
+    DateTime? dueDate,
   }) =>
       LibraryBook(
         id: id ?? this.id,
@@ -42,17 +42,24 @@ class LibraryBook {
         'author': author,
         'isbn': isbn,
         'category': category,
-        'isAvailable': isAvailable ? 1 : 0,
-        'dueDate': dueDate,
+        'isAvailable': isAvailable,
+        'dueDate': dueDate?.toIso8601String(),
       };
 
-  factory LibraryBook.fromJson(Map<String, dynamic> json) => LibraryBook(
-        id: json['id'],
-        title: json['title'],
-        author: json['author'],
-        isbn: json['isbn'],
-        category: json['category'],
-        isAvailable: json['isAvailable'] == 1 || json['isAvailable'] == true,
-        dueDate: json['dueDate'],
-      );
+  factory LibraryBook.fromJson(Map<String, dynamic> json) {
+    final rawDue = json['dueDate'];
+    DateTime? dueDate;
+    if (rawDue is String && rawDue.isNotEmpty) {
+      dueDate = DateTime.tryParse(rawDue);
+    }
+    return LibraryBook(
+      id: json['id'],
+      title: json['title'],
+      author: json['author'],
+      isbn: json['isbn'],
+      category: json['category'],
+      isAvailable: json['isAvailable'] == 1 || json['isAvailable'] == true,
+      dueDate: dueDate,
+    );
+  }
 }

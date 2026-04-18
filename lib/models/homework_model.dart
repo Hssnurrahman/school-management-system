@@ -5,6 +5,7 @@ class Homework {
   final DateTime dueDate;
   final String description;
   final bool isCompleted;
+  final String? className;
 
   Homework({
     String? id,
@@ -13,6 +14,7 @@ class Homework {
     required this.dueDate,
     required this.description,
     this.isCompleted = false,
+    this.className,
   }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
 
   Homework copyWith({
@@ -22,6 +24,7 @@ class Homework {
     DateTime? dueDate,
     String? description,
     bool? isCompleted,
+    String? className,
   }) =>
       Homework(
         id: id ?? this.id,
@@ -30,6 +33,7 @@ class Homework {
         dueDate: dueDate ?? this.dueDate,
         description: description ?? this.description,
         isCompleted: isCompleted ?? this.isCompleted,
+        className: className ?? this.className,
       );
 
   Map<String, dynamic> toJson() => {
@@ -39,6 +43,7 @@ class Homework {
         'dueDate': dueDate.toIso8601String(),
         'description': description,
         'isCompleted': isCompleted ? 1 : 0,
+        'className': className,
       };
 
   factory Homework.fromJson(Map<String, dynamic> json) => Homework(
@@ -48,5 +53,6 @@ class Homework {
         dueDate: DateTime.parse(json['dueDate']),
         description: json['description'],
         isCompleted: json['isCompleted'] == 1 || json['isCompleted'] == true,
+        className: json['className'],
       );
 }

@@ -23,17 +23,28 @@ class TransportRoute {
         'driverName': driverName,
         'driverPhone': driverPhone,
         'vehicleNumber': vehicleNumber,
-        'stops': stops.join('|'),
+        'stops': stops,
         'status': status,
       };
 
-  factory TransportRoute.fromJson(Map<String, dynamic> json) => TransportRoute(
-        id: json['id'],
-        routeName: json['routeName'],
-        driverName: json['driverName'],
-        driverPhone: json['driverPhone'],
-        vehicleNumber: json['vehicleNumber'],
-        stops: (json['stops'] as String).split('|'),
-        status: json['status'] ?? 'Active',
-      );
+  factory TransportRoute.fromJson(Map<String, dynamic> json) {
+    final rawStops = json['stops'];
+    final List<String> stops;
+    if (rawStops is List) {
+      stops = rawStops.cast<String>();
+    } else if (rawStops is String && rawStops.isNotEmpty) {
+      stops = rawStops.split('|');
+    } else {
+      stops = [];
+    }
+    return TransportRoute(
+      id: json['id'],
+      routeName: json['routeName'],
+      driverName: json['driverName'],
+      driverPhone: json['driverPhone'],
+      vehicleNumber: json['vehicleNumber'],
+      stops: stops,
+      status: json['status'] ?? 'Active',
+    );
+  }
 }

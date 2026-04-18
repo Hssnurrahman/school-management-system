@@ -1,5 +1,6 @@
 enum UserRole {
-  admin,
+  owner,
+  principal,
   teacher,
   student,
   parent,

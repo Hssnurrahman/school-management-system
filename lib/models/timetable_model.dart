@@ -1,4 +1,5 @@
 class TimetableEntry {
+  final String? id;
   final String day;
   final String startTime;
   final String endTime;
@@ -6,6 +7,7 @@ class TimetableEntry {
   final String room;
 
   TimetableEntry({
+    this.id,
     required this.day,
     required this.startTime,
     required this.endTime,

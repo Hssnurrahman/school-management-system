@@ -4,7 +4,6 @@ class ClassModel {
   final String teacherName;
   final int studentCount;
   final String roomNumber;
-  final String? subject;
 
   ClassModel({
     required this.id,
@@ -12,24 +11,21 @@ class ClassModel {
     required this.teacherName,
     required this.studentCount,
     required this.roomNumber,
-    this.subject,
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'teacherName': teacherName,
-        'studentCount': studentCount,
-        'roomNumber': roomNumber,
-        'subject': subject,
-      };
+    'id': id,
+    'name': name,
+    'teacherName': teacherName,
+    'studentCount': studentCount,
+    'roomNumber': roomNumber,
+  };
 
   factory ClassModel.fromJson(Map<String, dynamic> json) => ClassModel(
-        id: json['id'],
-        name: json['name'],
-        teacherName: json['teacherName'],
-        studentCount: json['studentCount'],
-        roomNumber: json['roomNumber'],
-        subject: json['subject'],
-      );
+    id: json['id'],
+    name: json['name'],
+    teacherName: json['teacherName'],
+    studentCount: json['studentCount'],
+    roomNumber: json['roomNumber'],
+  );
 }
