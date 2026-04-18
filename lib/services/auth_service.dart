@@ -1,57 +1,310 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../firebase_options.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import 'database_service.dart';
 
-class AuthService {
+String get _webApiKey => DefaultFirebaseOptions.web.apiKey;
+
+bool get _isLinux => !kIsWeb && Platform.isLinux;
+
+class AuthService extends ChangeNotifier {
+  static const _effectiveRoleKey = 'effectiveRole';
   static const _loggedInKey = 'loggedInUserId';
+
+  final _auth = FirebaseAuth.instance;
 
   UserModel? _currentUser;
   UserModel? get currentUser => _currentUser;
+  UserRole? _effectiveRole;
+  UserRole? get effectiveRole => _effectiveRole ?? _currentUser?.primaryRole;
+  bool get hasMultipleRoles =>
+      _currentUser != null && _currentUser!.additionalRoles.isNotEmpty;
 
-  /// Try to restore session from shared_preferences
-  Future<UserModel?> restoreSession() async {
+  // ── Role switching ──────────────────────────────────────────────────────────
+
+  Future<void> switchRole(UserRole role) async {
+    if (_currentUser == null) return;
+    if (role == _currentUser!.primaryRole ||
+        _currentUser!.additionalRoles.contains(role)) {
+      _effectiveRole = role;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_effectiveRoleKey, role.name);
+      notifyListeners();
+    }
+  }
+
+  Future<void> restoreEffectiveRole() async {
+    if (_currentUser == null) return;
     final prefs = await SharedPreferences.getInstance();
-    final id = prefs.getString(_loggedInKey);
-    if (id == null) return null;
-    final users = await dbService.getUsers();
+    final roleName = prefs.getString(_effectiveRoleKey);
+    if (roleName != null) {
+      try {
+        final role = UserRole.values.firstWhere((r) => r.name == roleName);
+        if (role == _currentUser!.primaryRole ||
+            _currentUser!.additionalRoles.contains(role)) {
+          _effectiveRole = role;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // ── Session ─────────────────────────────────────────────────────────────────
+
+  Future<UserModel?> restoreSession() async {
+    String? uid;
+
+    if (_isLinux) {
+      // Linux: restore from SharedPreferences since Firebase Auth has no persistence
+      final prefs = await SharedPreferences.getInstance();
+      uid = prefs.getString(_loggedInKey);
+    } else {
+      uid = _auth.currentUser?.uid;
+    }
+
+    if (uid == null) return null;
     try {
-      _currentUser = users.firstWhere((u) => u.id == id);
+      final users = await dbService.getUsers();
+      final user = users.firstWhere((u) => u.id == uid);
+      if (!user.isActive) return null;
+      _currentUser = user;
+      await restoreEffectiveRole();
+      notifyListeners();
       return _currentUser;
     } catch (_) {
       return null;
     }
   }
 
-  Future<UserModel?> login(String email, String password) async {
-    await Future.delayed(const Duration(milliseconds: 600));
+  Future<void> refreshCurrentUser() async {
+    if (_currentUser == null) return;
     final users = await dbService.getUsers();
     try {
-      final user = users.firstWhere(
-        (u) => u.email.toLowerCase() == email.toLowerCase().trim(),
-      );
+      final user = users.firstWhere((u) => u.id == _currentUser!.id);
+      if (user.isActive) {
+        _currentUser = user;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  // ── Login ───────────────────────────────────────────────────────────────────
+
+  Future<Object?> login(String email, String password) async {
+    try {
+      final String uid;
+
+      if (_isLinux) {
+        uid = await _loginViaRest(email.trim().toLowerCase(), password);
+      } else {
+        final credential = await _auth.signInWithEmailAndPassword(
+          email: email.trim().toLowerCase(),
+          password: password,
+        );
+        uid = credential.user!.uid;
+      }
+
+      final users = await dbService.getUsers();
+      final user = users.firstWhere((u) => u.id == uid);
+
+      if (!user.isActive) {
+        if (!_isLinux) await _auth.signOut();
+        return 'Your account is pending approval.';
+      }
+      if (user.primaryRole == UserRole.student ||
+          user.primaryRole == UserRole.parent) {
+        if (!_isLinux) await _auth.signOut();
+        return 'Student & Parent portal coming soon.';
+      }
+
       _currentUser = user;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_loggedInKey, user.id);
+      await restoreEffectiveRole();
+
+      if (_isLinux) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_loggedInKey, uid);
+      }
+
+      notifyListeners();
       return user;
-    } catch (_) {
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential') { return null; }
+      return e.message ?? 'Login failed.';
+    } catch (e) {
+      if (e.toString().contains('INVALID_PASSWORD') ||
+          e.toString().contains('EMAIL_NOT_FOUND') ||
+          e.toString().contains('INVALID_LOGIN_CREDENTIALS')) { return null; }
       return null;
     }
   }
 
-  Future<void> logout() async {
-    _currentUser = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_loggedInKey);
+  /// Firebase Auth REST API sign-in for Linux desktop.
+  Future<String> _loginViaRest(String email, String password) async {
+    final url = Uri.parse(
+      'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$_webApiKey',
+    );
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        'returnSecureToken': true,
+      }),
+    );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data.containsKey('error')) {
+      final msg = data['error']['message'] as String;
+      throw Exception(msg);
+    }
+    return data['localId'] as String;
   }
 
-  // Fallback mock users (used before DB is ready)
-  static List<UserModel> get mockUsers => [
-        UserModel(id: '1', name: 'Admin User', email: 'admin@school.com', role: UserRole.admin),
-        UserModel(id: '2', name: 'John Teacher', email: 'teacher@school.com', role: UserRole.teacher),
-        UserModel(id: '3', name: 'Alice Student', email: 'student@school.com', role: UserRole.student),
-        UserModel(id: '4', name: 'Parent User', email: 'parent@school.com', role: UserRole.parent),
-      ];
+  // ── Register ─────────────────────────────────────────────────────────────────
+
+  Future<Object?> register({
+    required String name,
+    required String email,
+    required String password,
+    required UserRole role,
+    String? phone,
+    String? className,
+    String? subject,
+  }) async {
+    try {
+      final String uid;
+
+      if (_isLinux) {
+        uid = await _registerViaRest(email.trim().toLowerCase(), password);
+      } else {
+        final credential = await _auth.createUserWithEmailAndPassword(
+          email: email.trim().toLowerCase(),
+          password: password,
+        );
+        uid = credential.user!.uid;
+      }
+
+      final newUser = UserModel(
+        id: uid,
+        name: name,
+        email: email.trim().toLowerCase(),
+        primaryRole: role,
+        isActive: true,
+        phone: phone,
+        className: role == UserRole.student ? className : null,
+        subject: role == UserRole.teacher ? subject : null,
+      );
+      await dbService.insertUser(newUser);
+      return newUser;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        return 'An account with this email already exists.';
+      }
+      return e.message ?? 'Registration failed.';
+    } catch (e) {
+      if (e.toString().contains('EMAIL_EXISTS')) {
+        return 'An account with this email already exists.';
+      }
+      return 'Registration failed: $e';
+    }
+  }
+
+  /// Firebase Auth REST API sign-up for Linux desktop.
+  Future<String> _registerViaRest(String email, String password) async {
+    final url = Uri.parse(
+      'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$_webApiKey',
+    );
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        'returnSecureToken': true,
+      }),
+    );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data.containsKey('error')) {
+      final msg = data['error']['message'] as String;
+      throw Exception(msg);
+    }
+    return data['localId'] as String;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  Future<bool> hasAdmin() async {
+    final users = await dbService.getUsers();
+    return users.any((u) =>
+        u.primaryRole == UserRole.owner ||
+        u.primaryRole == UserRole.principal);
+  }
+
+  Future<String?> resetPassword({
+    required String email,
+    required String senderEmail,
+    required String senderAppPassword,
+  }) async {
+    try {
+      if (_isLinux) {
+        await _sendPasswordResetViaRest(email.trim().toLowerCase());
+      } else {
+        await _auth.sendPasswordResetEmail(email: email.trim().toLowerCase());
+      }
+
+      try {
+        final smtpServer = gmail(senderEmail, senderAppPassword);
+        final message = Message()
+          ..from = Address(senderEmail, 'Schoolify')
+          ..recipients.add(email)
+          ..subject = 'Your Schoolify Password Reset'
+          ..text = 'Hello,\n\n'
+              'A password reset link has been sent to $email.\n'
+              'Please check your inbox and follow the link to reset your password.\n\n'
+              '– Schoolify';
+        await send(message, smtpServer);
+      } catch (_) {}
+
+      return null;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') return 'No account found with that email.';
+      return e.message ?? 'Failed to send reset email.';
+    } catch (e) {
+      return 'Failed to send reset email.';
+    }
+  }
+
+  Future<void> _sendPasswordResetViaRest(String email) async {
+    final url = Uri.parse(
+      'https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=$_webApiKey',
+    );
+    await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'requestType': 'PASSWORD_RESET', 'email': email}),
+    );
+  }
+
+  // ── Logout ───────────────────────────────────────────────────────────────────
+
+  Future<void> logout() async {
+    if (!_isLinux) await _auth.signOut();
+    _currentUser = null;
+    _effectiveRole = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_loggedInKey);
+    await prefs.remove(_effectiveRoleKey);
+    notifyListeners();
+  }
 }
 
 final authService = AuthService();
