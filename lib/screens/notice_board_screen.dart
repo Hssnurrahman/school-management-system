@@ -4,6 +4,7 @@ import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
 import '../widgets/confirm_delete_dialog.dart';
+import '../widgets/shimmer_box.dart';
 
 class NoticeBoardScreen extends StatefulWidget {
   const NoticeBoardScreen({super.key});
@@ -108,7 +109,11 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
             ],
           ),
         ),
-      );
+      ).whenComplete(() {
+        titleController.dispose();
+        contentController.dispose();
+        authorController.dispose();
+      });
   }
 
   void _showDeleteConfirmation(Notice notice) {
@@ -212,7 +217,7 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen>
               ),
             ),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else if (filtered.isEmpty)
             SliverFillRemaining(
               child: Center(

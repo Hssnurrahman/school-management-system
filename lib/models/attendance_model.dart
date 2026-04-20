@@ -21,10 +21,16 @@ class Attendance {
         'isLate': isLate ? 1 : 0,
       };
 
+  static DateTime _parseDate(Object? raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is DateTime) return raw;
+    return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+  }
+
   factory Attendance.fromJson(Map<String, dynamic> json) => Attendance(
-        studentId: json['studentId'],
-        studentName: json['studentName'],
-        date: DateTime.parse(json['date']),
+        studentId: (json['studentId'] ?? '') as String,
+        studentName: (json['studentName'] ?? '') as String,
+        date: _parseDate(json['date']),
         isPresent: json['isPresent'] == 1 || json['isPresent'] == true,
         isLate: json['isLate'] == 1 || json['isLate'] == true,
       );

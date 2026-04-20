@@ -4,6 +4,7 @@ import '../services/database_service.dart';
 import '../widgets/app_bottom_sheet.dart';
 import '../widgets/confirm_delete_dialog.dart';
 import '../utils/app_snackbar.dart';
+import '../widgets/shimmer_box.dart';
 
 class TransportScreen extends StatefulWidget {
   const TransportScreen({super.key});
@@ -94,7 +95,13 @@ class _TransportScreenState extends State<TransportScreen> {
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      routeNameController.dispose();
+      driverNameController.dispose();
+      driverPhoneController.dispose();
+      vehicleController.dispose();
+      stopsController.dispose();
+    });
   }
 
   @override
@@ -120,7 +127,7 @@ class _TransportScreenState extends State<TransportScreen> {
             ),
           ),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -151,7 +158,7 @@ class _TransportScreenState extends State<TransportScreen> {
       message: 'Remove "${route.routeName}"?',
       onConfirm: () async {
         await dbService.deleteRoute(route.id);
-        await _loadRoutes();
+        if (mounted) await _loadRoutes();
       },
     );
   }

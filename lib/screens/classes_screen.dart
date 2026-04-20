@@ -4,6 +4,7 @@ import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
 import '../widgets/confirm_delete_dialog.dart';
+import '../widgets/shimmer_box.dart';
 
 class ClassesScreen extends StatefulWidget {
   const ClassesScreen({super.key});
@@ -145,7 +146,11 @@ class _ClassesScreenState extends State<ClassesScreen>
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      teacherController.dispose();
+      roomController.dispose();
+    });
   }
 
   void _deleteClass(ClassModel cls) {
@@ -155,8 +160,69 @@ class _ClassesScreenState extends State<ClassesScreen>
       message: 'Remove ${cls.name}?',
       onConfirm: () async {
         await dbService.deleteClass(cls.id);
-        await _loadClasses();
+        if (mounted) await _loadClasses();
       },
+    );
+  }
+
+  Widget _buildClassSkeleton(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16, top: 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141E30) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : const Color(0xFFE8EDF5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const ShimmerBox(width: 52, height: 52, borderRadius: 14),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    ShimmerBox(width: 120, height: 15, borderRadius: 4),
+                    SizedBox(height: 6),
+                    ShimmerBox(width: 80, height: 11, borderRadius: 4),
+                  ],
+                ),
+              ),
+              const ShimmerBox(width: 90, height: 24, borderRadius: 999),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: const [
+              ShimmerBox(width: 34, height: 34, borderRadius: 10),
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: 120, height: 12, borderRadius: 4),
+                    SizedBox(height: 6),
+                    Row(
+                      children: [
+                        ShimmerBox(width: 60, height: 20, borderRadius: 999),
+                        SizedBox(width: 5),
+                        ShimmerBox(width: 72, height: 20, borderRadius: 999),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -253,8 +319,14 @@ class _ClassesScreenState extends State<ClassesScreen>
             ),
           ),
           if (_isLoading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildClassSkeleton(isDark),
+                  childCount: 4,
+                ),
+              ),
             )
           else
             SliverPadding(
@@ -369,14 +441,32 @@ class _ClassCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: _accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        color: _accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: _accent.withValues(alpha: 0.35),
+                          width: 0.8,
+                        ),
                       ),
-                      child: Text(
-                        '$studentCount student${studentCount == 1 ? '' : 's'}',
-                        style: const TextStyle(color: _accent, fontWeight: FontWeight.w700, fontSize: 12),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.groups_rounded,
+                              size: 13, color: _accent),
+                          const SizedBox(width: 5),
+                          Text(
+                            '$studentCount student${studentCount == 1 ? '' : 's'}',
+                            style: const TextStyle(
+                              color: _accent,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -509,12 +599,32 @@ class _TeacherRow extends StatelessWidget {
                     children: subjects.map((s) {
                       final c = _colorFor(s);
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: c.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
+                          color: c.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: c.withValues(alpha: 0.35),
+                            width: 0.8,
+                          ),
                         ),
-                        child: Text(s, style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.w700)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.menu_book_rounded, size: 12, color: c),
+                            const SizedBox(width: 4),
+                            Text(
+                              s,
+                              style: TextStyle(
+                                color: c,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     }).toList(),
                   ),

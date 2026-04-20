@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/grade_model.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
+import '../widgets/shimmer_box.dart';
 
 class GradesScreen extends StatefulWidget {
   final String studentId;
@@ -120,7 +121,7 @@ class _GradesScreenState extends State<GradesScreen> {
             ),
           ),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else if (_grades.isEmpty)
             SliverFillRemaining(
               child: Center(

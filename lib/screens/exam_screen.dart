@@ -5,6 +5,7 @@ import '../models/class_model.dart';
 import '../models/subject_model.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
+import '../widgets/shimmer_box.dart';
 
 class ExamScreen extends StatefulWidget {
   final UserModel teacher;
@@ -111,6 +112,7 @@ class _ExamScreenState extends State<ExamScreen>
     final exams = _teacherClasses.isNotEmpty
         ? await dbService.getExamsForClasses(_teacherClasses)
         : await dbService.getExams();
+    if (!mounted) return;
     setState(() => _allExams = exams);
   }
 
@@ -171,13 +173,61 @@ class _ExamScreenState extends State<ExamScreen>
     return counts;
   }
 
+  Widget _buildExamCardSkeleton(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141E30) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : const Color(0xFFE8EDF5),
+        ),
+      ),
+      child: Row(
+        children: [
+          const ShimmerBox(width: 52, height: 52, borderRadius: 14),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                ShimmerBox(width: 160, height: 14),
+                SizedBox(height: 8),
+                ShimmerBox(width: 110, height: 10),
+                SizedBox(height: 8),
+                ShimmerBox(width: 70, height: 20, borderRadius: 999),
+              ],
+            ),
+          ),
+          const ShimmerBox(width: 24, height: 24, borderRadius: 8),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF2563EB),
+          foregroundColor: Colors.white,
+          title: const Text(
+            'Exams',
+            style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+          ),
+          centerTitle: true,
+        ),
+        body: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          itemCount: 6,
+          itemBuilder: (_, i) => _buildExamCardSkeleton(isDark),
+        ),
       );
     }
 
@@ -317,7 +367,7 @@ class _ExamScreenState extends State<ExamScreen>
             onPressed: () async {
               final nav = Navigator.of(context);
               await dbService.deleteExam(exam.id);
-              nav.pop();
+              if (context.mounted) nav.pop();
               _load();
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -1076,7 +1126,11 @@ class _ExamScreenState extends State<ExamScreen>
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      titleCtrl.dispose();
+      marksCtrl.dispose();
+      descCtrl.dispose();
+    });
   }
 
   Widget _timePicker(
@@ -1745,7 +1799,11 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? ListView.builder(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              itemCount: 6,
+              itemBuilder: (_, i) => _buildResultSkeleton(isDark),
+            )
           : Column(
               children: [
                 Container(
@@ -1931,4 +1989,37 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
                   fontWeight: FontWeight.w500)),
         ],
       );
+
+  Widget _buildResultSkeleton(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141E30) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : const Color(0xFFE8EDF5),
+        ),
+      ),
+      child: Row(
+        children: [
+          const ShimmerBox(width: 40, height: 40, borderRadius: 12),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                ShimmerBox(width: 130, height: 13),
+                SizedBox(height: 6),
+                ShimmerBox(width: 70, height: 10),
+              ],
+            ),
+          ),
+          const ShimmerBox(width: 48, height: 16),
+        ],
+      ),
+    );
+  }
 }

@@ -4,6 +4,7 @@ import '../models/subject_model.dart';
 import '../utils/app_snackbar.dart';
 import '../services/database_service.dart';
 import '../widgets/app_bottom_sheet.dart';
+import '../widgets/shimmer_box.dart';
 
 class TimetableScreen extends StatefulWidget {
   final String?
@@ -39,6 +40,7 @@ class _TimetableScreenState extends State<TimetableScreen>
 
   Future<void> _loadData() async {
     final subjects = await dbService.getSubjects();
+    if (!mounted) return;
     setState(() {
       _subjects = subjects;
     });
@@ -207,11 +209,9 @@ class _TimetableScreenState extends State<TimetableScreen>
                       endTime: _formatTime(endTime),
                       subject: selectedSubject!,
                       room: roomController.text.isEmpty ? 'TBD' : roomController.text,
-                    );
-                    await dbService.insertTimetableEntry(
-                      entry,
                       className: widget.className ?? 'All',
                     );
+                    await dbService.insertTimetableEntry(entry);
                     if (context.mounted) Navigator.pop(context);
                     await _loadTimetable();
                   },
@@ -222,7 +222,9 @@ class _TimetableScreenState extends State<TimetableScreen>
               ],
             ),
           ),
-        );
+        ).whenComplete(() {
+          roomController.dispose();
+        });
   }
 
   @override
@@ -299,7 +301,7 @@ class _TimetableScreenState extends State<TimetableScreen>
           ),
         ],
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const ShimmerListSkeleton()
             : TabBarView(
                 controller: _tabController,
                 children: _days

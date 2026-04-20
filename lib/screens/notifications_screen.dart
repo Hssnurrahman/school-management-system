@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/notification_model.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
+import '../widgets/shimmer_box.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -112,7 +113,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
             ),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),

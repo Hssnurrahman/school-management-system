@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'audit_log_screen.dart';
 import 'login_screen.dart';
 import '../models/user_role.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/theme_service.dart';
+import '../theme/app_theme.dart';
 import '../utils/app_snackbar.dart';
+import '../widgets/animated_widgets.dart';
+import '../widgets/modern_app_bar.dart';
+import '../widgets/modern_card.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,27 +24,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   String _language = 'English';
   Map<String, String> _schoolInfo = {};
   late AnimationController _animationController;
-  late List<Animation<double>> _fadeAnimations;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _fadeAnimations = List.generate(
-      6,
-      (index) => Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(
-          parent: _animationController,
-          curve: Interval(
-            (index * 0.1).clamp(0, 0.8),
-            (0.4 + index * 0.1).clamp(0, 1.0),
-            curve: Curves.easeOut,
-          ),
-        ),
-      ),
+      duration: const Duration(milliseconds: 800),
     );
     _animationController.forward();
     _loadSchoolInfo();
@@ -58,117 +49,131 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return ListenableBuilder(
       listenable: Listenable.merge([themeService, authService]),
       builder: (context, child) {
-        final isDark = themeService.isDarkMode;
-
         return Scaffold(
+          backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
           body: CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              SliverAppBar(
-                expandedHeight: 160,
-                pinned: true,
-                backgroundColor: const Color(0xFF1E293B),
-                foregroundColor: Colors.white,
-                flexibleSpace: FlexibleSpaceBar(
-                  titlePadding: const EdgeInsets.fromLTRB(20, 0, 16, 16),
-                  title: const Text(
-                    'Settings',
-                    style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 20),
-                  ),
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)],
-                      ),
-                    ),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 24),
-                        child: Icon(Icons.settings_rounded, color: Colors.white.withValues(alpha: 0.08), size: 130),
-                      ),
-                    ),
-                  ),
-                ),
+              // App Bar
+              ModernAppBar(
+                title: 'Settings',
+                expandedHeight: 140,
+                backgroundIcon: Icons.settings_rounded,
               ),
+              
+              // Content
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      FadeTransition(
-                        opacity: _fadeAnimations[0],
+                      // Profile Card
+                      SlideUpFade(
                         child: _buildProfileCard(isDark),
                       ),
-                      if (authService.currentUser?.primaryRole ==
-                              UserRole.owner ||
-                          authService.currentUser?.primaryRole ==
-                              UserRole.principal) ...[
+                      
+                      // School Info Card (for admins)
+                      if (authService.currentUser?.primaryRole == UserRole.owner ||
+                          authService.currentUser?.primaryRole == UserRole.principal) ...[
                         const SizedBox(height: 16),
-                        FadeTransition(
-                          opacity: _fadeAnimations[0],
+                        SlideUpFade(
+                          delay: const Duration(milliseconds: 100),
                           child: _buildSchoolInfoCard(isDark),
                         ),
                       ],
+                      
                       const SizedBox(height: 28),
-                      FadeTransition(
-                        opacity: _fadeAnimations[1],
+                      
+                      // Preferences Section
+                      SlideUpFade(
+                        delay: const Duration(milliseconds: 200),
                         child: _buildSectionLabel('Preferences'),
                       ),
-                      const SizedBox(height: 10),
-                      FadeTransition(
-                        opacity: _fadeAnimations[1],
-                        child: _buildSettingsGroup(isDark, [
+                      const SizedBox(height: 12),
+                      SlideUpFade(
+                        delay: const Duration(milliseconds: 250),
+                        child: _buildSettingsGroup([
                           _SettingItem(
                             icon: Icons.notifications_none_rounded,
-                            iconColor: const Color(0xFF0EA5E9),
+                            iconColor: AppColors.accentCyan,
                             title: 'Notifications',
                             subtitle: 'Manage alerts and updates',
                             trailing: Switch.adaptive(
                               value: _notificationsEnabled,
                               onChanged: (val) =>
                                   setState(() => _notificationsEnabled = val),
-                              activeTrackColor: const Color(0xFF0EA5E9),
+                              activeThumbColor: AppColors.accentCyan,
                             ),
                           ),
                           _SettingItem(
                             icon: Icons.dark_mode_outlined,
-                            iconColor: const Color(0xFF0284C7),
+                            iconColor: AppColors.primaryPurple,
                             title: 'Dark Mode',
                             subtitle: 'Reduce eye strain at night',
                             trailing: Switch.adaptive(
                               value: themeService.isDarkMode,
                               onChanged: (val) => themeService.setDarkMode(val),
-                              activeTrackColor: const Color(0xFF0284C7),
+                              activeThumbColor: AppColors.primaryPurple,
                             ),
                           ),
                           _SettingItem(
                             icon: Icons.language_rounded,
-                            iconColor: const Color(0xFF10B981),
+                            iconColor: AppColors.accentEmerald,
                             title: 'Language',
                             subtitle: _language,
                             onTap: _showLanguagePicker,
                           ),
                         ]),
                       ),
+                      
                       const SizedBox(height: 28),
-                      FadeTransition(
-                        opacity: _fadeAnimations[2],
+                      
+                      // Administration Section (Owner only)
+                      if (authService.currentUser?.primaryRole ==
+                          UserRole.owner) ...[
+                        SlideUpFade(
+                          delay: const Duration(milliseconds: 280),
+                          child: _buildSectionLabel('Administration'),
+                        ),
+                        const SizedBox(height: 12),
+                        SlideUpFade(
+                          delay: const Duration(milliseconds: 290),
+                          child: _buildSettingsGroup([
+                            _SettingItem(
+                              icon: Icons.history_rounded,
+                              iconColor: AppColors.primaryTeal,
+                              title: 'Audit Log',
+                              subtitle: 'Sensitive actions (fees, roles, settings)',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const AuditLogScreen(),
+                                ),
+                              ),
+                            ),
+                          ]),
+                        ),
+                        const SizedBox(height: 28),
+                      ],
+
+                      // Account Section
+                      SlideUpFade(
+                        delay: const Duration(milliseconds: 300),
                         child: _buildSectionLabel('Account'),
                       ),
-                      const SizedBox(height: 10),
-                      FadeTransition(
-                        opacity: _fadeAnimations[2],
-                        child: _buildSettingsGroup(isDark, [
+                      const SizedBox(height: 12),
+                      SlideUpFade(
+                        delay: const Duration(milliseconds: 350),
+                        child: _buildSettingsGroup([
                           _SettingItem(
                             icon: Icons.swap_horiz_rounded,
-                            iconColor: const Color(0xFF0EA5E9),
+                            iconColor: AppColors.accentCyan,
                             title: 'Switch Role',
                             subtitle: authService.hasMultipleRoles
                                 ? 'Current: ${_roleTitle(authService.effectiveRole)}'
@@ -179,27 +184,30 @@ class _SettingsScreenState extends State<SettingsScreen>
                           ),
                           _SettingItem(
                             icon: Icons.lock_outline_rounded,
-                            iconColor: const Color(0xFFF59E0B),
+                            iconColor: AppColors.accentAmber,
                             title: 'Change Password',
                             onTap: () => _showComingSoon('Change Password'),
                           ),
                           _SettingItem(
                             icon: Icons.help_outline_rounded,
-                            iconColor: const Color(0xFFEC4899),
+                            iconColor: AppColors.accentPink,
                             title: 'Help & Feedback',
                             onTap: () => _showComingSoon('Help & Support'),
                           ),
                           _SettingItem(
                             icon: Icons.info_outline_rounded,
-                            iconColor: const Color(0xFF14B8A6),
+                            iconColor: AppColors.primaryTeal,
                             title: 'About App',
                             onTap: _showAboutDialog,
                           ),
                         ]),
                       ),
+                      
                       const SizedBox(height: 32),
-                      FadeTransition(
-                        opacity: _fadeAnimations[3],
+                      
+                      // Sign Out Button
+                      SlideUpFade(
+                        delay: const Duration(milliseconds: 400),
                         child: _buildSignOutButton(),
                       ),
                       const SizedBox(height: 40),
@@ -217,10 +225,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget _buildSectionLabel(String label) {
     return Text(
       label.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 11,
+      style: TextStyle(
+        fontSize: 12,
         fontWeight: FontWeight.w800,
-        color: Color(0xFF94A3B8),
+        color: AppColors.lightTextMuted,
         letterSpacing: 1.2,
       ),
     );
@@ -232,35 +240,25 @@ class _SettingsScreenState extends State<SettingsScreen>
     final email = u?.email ?? '';
     final initial = name.isNotEmpty ? name.trim()[0].toUpperCase() : '?';
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141E30) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : const Color(0xFFE8EDF5),
-        ),
-      ),
+    return ModernCard(
+      padding: const EdgeInsets.all(20),
+      borderRadius: 20,
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0D9488), Color(0xFF2563EB)],
-              ),
-              borderRadius: BorderRadius.circular(18),
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              shape: BoxShape.circle,
             ),
             child: CircleAvatar(
-              radius: 30,
-              backgroundColor: isDark ? const Color(0xFF141E30) : Colors.white,
+              radius: 32,
+              backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
               child: Text(
                 initial,
                 style: const TextStyle(
-                  color: Color(0xFF0D9488),
-                  fontSize: 22,
+                  color: AppColors.primaryTeal,
+                  fontSize: 26,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -275,30 +273,38 @@ class _SettingsScreenState extends State<SettingsScreen>
                   name,
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 17,
+                    fontSize: 18,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
                   email.isEmpty ? '—' : email,
                   style: TextStyle(
-                    color: isDark
-                        ? const Color(0xFF64748B)
-                        : const Color(0xFF94A3B8),
+                    color: isDark 
+                        ? AppColors.darkTextSecondary 
+                        : AppColors.lightTextSecondary,
                     fontWeight: FontWeight.w500,
-                    fontSize: 13,
+                    fontSize: 14,
                   ),
                 ),
                 if (u != null) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    _roleTitle(authService.effectiveRole),
-                    style: TextStyle(
-                      color: isDark
-                          ? const Color(0xFF64748B)
-                          : const Color(0xFF94A3B8),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _roleTitle(authService.effectiveRole),
+                      style: const TextStyle(
+                        color: AppColors.primaryTeal,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
                     ),
                   ),
                 ],
@@ -308,13 +314,13 @@ class _SettingsScreenState extends State<SettingsScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+              color: AppColors.primaryTeal.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.edit_outlined,
-              color: Color(0xFF0D9488),
-              size: 18,
+              color: AppColors.primaryTeal,
+              size: 20,
             ),
           ),
         ],
@@ -322,31 +328,23 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildSettingsGroup(bool isDark, List<_SettingItem> items) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141E30) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : const Color(0xFFE8EDF5),
-        ),
-      ),
+  Widget _buildSettingsGroup(List<_SettingItem> items) {
+    return ModernCard(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      borderRadius: 20,
       child: Column(
         children: items.asMap().entries.map((entry) {
           final index = entry.key;
           final item = entry.value;
           return Column(
             children: [
-              _buildSettingTile(isDark: isDark, item: item),
+              _buildSettingTile(item: item),
               if (index < items.length - 1)
                 Divider(
                   height: 1,
-                  indent: 60,
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : const Color(0xFFE8EDF5),
+                  indent: 68,
+                  endIndent: 16,
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
                 ),
             ],
           );
@@ -355,46 +353,46 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildSettingTile({required bool isDark, required _SettingItem item}) {
+  Widget _buildSettingTile({required _SettingItem item}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return ListTile(
       onTap: item.onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: item.iconColor.withValues(alpha: 0.1),
+          color: item.iconColor.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(item.icon, color: item.iconColor, size: 20),
+        child: Icon(item.icon, color: item.iconColor, size: 22),
       ),
       title: Text(
         item.title,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
       ),
       subtitle: item.subtitle != null
           ? Text(
               item.subtitle!,
               style: TextStyle(
-                color: isDark
-                    ? const Color(0xFF64748B)
-                    : const Color(0xFF94A3B8),
-                fontSize: 12,
+                color: isDark 
+                    ? AppColors.darkTextSecondary 
+                    : AppColors.lightTextSecondary,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
             )
           : null,
-      trailing:
-          item.trailing ??
+      trailing: item.trailing ??
           (item.onTap != null
               ? Icon(
                   Icons.chevron_right_rounded,
-                  size: 20,
-                  color: isDark
-                      ? const Color(0xFF334155)
-                      : const Color(0xFFCBD5E1),
+                  size: 22,
+                  color: isDark 
+                      ? AppColors.darkTextMuted 
+                      : AppColors.lightTextMuted,
                 )
               : null),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
 
@@ -411,15 +409,13 @@ class _SettingsScreenState extends State<SettingsScreen>
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-          ),
+          gradient: AppColors.roseGradient,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFEF4444).withValues(alpha: 0.25),
+              color: AppColors.accentRose.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -428,19 +424,118 @@ class _SettingsScreenState extends State<SettingsScreen>
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.logout_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 10),
+            Icon(Icons.logout_rounded, color: Colors.white, size: 22),
+            SizedBox(width: 12),
             Text(
               'Sign Out',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
-                fontSize: 15,
+                fontSize: 16,
+                letterSpacing: 0.3,
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSchoolInfoCard(bool isDark) {
+    final name = _schoolInfo['name']?.isNotEmpty == true
+        ? _schoolInfo['name']!
+        : 'Not set';
+    final address = _schoolInfo['address'] ?? '';
+    final phone = _schoolInfo['phone'] ?? '';
+    final email = _schoolInfo['email'] ?? '';
+    final canEditSchool =
+        authService.currentUser?.primaryRole == UserRole.owner;
+
+    return ModernCard(
+      padding: const EdgeInsets.all(20),
+      borderRadius: 20,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTeal.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.school_rounded,
+                  color: AppColors.primaryTeal,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'School Information',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+              const Spacer(),
+              if (canEditSchool)
+                GestureDetector(
+                  onTap: () => _showEditSchoolInfoSheet(isDark),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.edit_outlined,
+                      color: AppColors.primaryTeal,
+                      size: 18,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _infoRow(Icons.business_rounded, name, isDark),
+          if (address.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _infoRow(Icons.location_on_outlined, address, isDark),
+          ],
+          if (phone.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _infoRow(Icons.phone_outlined, phone, isDark),
+          ],
+          if (email.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _infoRow(Icons.email_outlined, email, isDark),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String text, bool isDark) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: isDark 
+                  ? AppColors.darkTextSecondary 
+                  : AppColors.lightTextSecondary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -456,6 +551,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   void _showRoleSwitcher() {
     final currentRole = authService.effectiveRole;
     final allRoles = authService.currentUser?.allRoles ?? [];
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -478,15 +574,18 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             const Text(
               'Switch Role',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
               'Select the role you want to use for this session',
-              style: TextStyle(color: Colors.grey.withValues(alpha: 0.7)),
+              style: TextStyle(
+                color: Colors.grey.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 24),
             ...allRoles.map((role) => _buildRoleTile(role, currentRole)),
@@ -515,13 +614,13 @@ class _SettingsScreenState extends State<SettingsScreen>
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF0EA5E9).withValues(alpha: 0.15)
+              ? AppColors.accentCyan.withValues(alpha: 0.15)
               : Colors.grey.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           _getRoleIcon(role),
-          color: isSelected ? const Color(0xFF0EA5E9) : Colors.grey,
+          color: isSelected ? AppColors.accentCyan : Colors.grey,
           size: 22,
         ),
       ),
@@ -529,10 +628,11 @@ class _SettingsScreenState extends State<SettingsScreen>
         role.name[0].toUpperCase() + role.name.substring(1),
         style: TextStyle(
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+          fontSize: 15,
         ),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: Color(0xFF0EA5E9))
+          ? const Icon(Icons.check_circle_rounded, color: AppColors.accentCyan)
           : null,
     );
   }
@@ -556,37 +656,48 @@ class _SettingsScreenState extends State<SettingsScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0D9488), Color(0xFF2563EB)],
-                ),
-                borderRadius: BorderRadius.circular(20),
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.school_rounded,
                 color: Colors.white,
-                size: 44,
+                size: 48,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             const Text(
               'Schoolify',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontSize: 24, 
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               'Version 1.0.0',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+              style: TextStyle(
+                fontSize: 14, 
+                color: Colors.grey.shade500,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            const SizedBox(height: 14),
-            const Text(
+            const SizedBox(height: 16),
+            Text(
               'A comprehensive solution for managing school operations, students, staff, and more.',
-              style: TextStyle(fontSize: 13, height: 1.5),
+              style: TextStyle(
+                fontSize: 14, 
+                height: 1.6,
+                color: Colors.grey.shade600,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -616,18 +727,18 @@ class _SettingsScreenState extends State<SettingsScreen>
           children: [
             Center(
               child: Container(
-                width: 36,
+                width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.25),
+                  color: Colors.grey.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             const Text(
               'Select Language',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 16),
             ...['English', 'Spanish', 'French', 'Arabic'].map<Widget>((lang) {
@@ -636,7 +747,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF0D9488).withValues(alpha: 0.08)
+                      ? AppColors.primaryTeal.withValues(alpha: 0.1)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -644,16 +755,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                   title: Text(
                     lang,
                     style: TextStyle(
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w600,
-                      color: isSelected ? const Color(0xFF0D9488) : null,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                      color: isSelected ? AppColors.primaryTeal : null,
                     ),
                   ),
                   trailing: isSelected
                       ? const Icon(
                           Icons.check_circle_rounded,
-                          color: Color(0xFF0D9488),
+                          color: AppColors.primaryTeal,
                         )
                       : null,
                   shape: RoundedRectangleBorder(
@@ -673,113 +782,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildSchoolInfoCard(bool isDark) {
-    final name = _schoolInfo['name']?.isNotEmpty == true
-        ? _schoolInfo['name']!
-        : 'Not set';
-    final address = _schoolInfo['address'] ?? '';
-    final phone = _schoolInfo['phone'] ?? '';
-    final email = _schoolInfo['email'] ?? '';
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141E30) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : const Color(0xFFE8EDF5),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.school_rounded,
-                  color: Color(0xFF0D9488),
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'School Information',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => _showEditSchoolInfoSheet(isDark),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.edit_outlined,
-                    color: Color(0xFF0D9488),
-                    size: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _infoRow(Icons.business_rounded, name, isDark),
-          if (address.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _infoRow(Icons.location_on_outlined, address, isDark),
-          ],
-          if (phone.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _infoRow(Icons.phone_outlined, phone, isDark),
-          ],
-          if (email.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _infoRow(Icons.email_outlined, email, isDark),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String text, bool isDark) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 15,
-          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: isDark
-                  ? const Color(0xFFCBD5E1)
-                  : const Color(0xFF334155),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   void _showEditSchoolInfoSheet(bool isDark) {
     final nameCtrl = TextEditingController(text: _schoolInfo['name'] ?? '');
-    final addressCtrl =
-        TextEditingController(text: _schoolInfo['address'] ?? '');
+    final addressCtrl = TextEditingController(text: _schoolInfo['address'] ?? '');
     final phoneCtrl = TextEditingController(text: _schoolInfo['phone'] ?? '');
     final emailCtrl = TextEditingController(text: _schoolInfo['email'] ?? '');
     bool saving = false;
@@ -792,8 +797,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         builder: (ctx, setSheetState) => Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom + 24,
@@ -808,21 +812,20 @@ class _SettingsScreenState extends State<SettingsScreen>
               children: [
                 Center(
                   child: Container(
-                    width: 36,
+                    width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.25),
+                      color: Colors.grey.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 const Text(
                   'Edit School Info',
-                  style:
-                      TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 TextField(
                   controller: nameCtrl,
                   decoration: const InputDecoration(
@@ -830,7 +833,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     prefixIcon: Icon(Icons.school_rounded),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 TextField(
                   controller: addressCtrl,
                   decoration: const InputDecoration(
@@ -838,7 +841,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     prefixIcon: Icon(Icons.location_on_outlined),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 TextField(
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
@@ -847,7 +850,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 TextField(
                   controller: emailCtrl,
                   keyboardType: TextInputType.emailAddress,
@@ -856,38 +859,55 @@ class _SettingsScreenState extends State<SettingsScreen>
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
+                  height: 56,
                   child: ElevatedButton(
                     onPressed: saving
                         ? null
                         : () async {
                             setSheetState(() => saving = true);
-                            await dbService.saveSchoolInfo({
+                            final info = {
                               'name': nameCtrl.text.trim(),
                               'address': addressCtrl.text.trim(),
                               'phone': phoneCtrl.text.trim(),
                               'email': emailCtrl.text.trim(),
-                            });
+                            };
+                            await dbService.saveSchoolInfo(info);
+                            await dbService.writeAudit(
+                              actor: authService.currentUser,
+                              action: 'settings.school_info.update',
+                              targetType: 'settings',
+                              targetId: 'school_info',
+                              metadata: info,
+                            );
                             if (ctx.mounted) Navigator.pop(ctx);
                             await _loadSchoolInfo();
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
+                      backgroundColor: AppColors.primaryTeal,
                       foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 50),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                     child: saving
                         ? const SizedBox(
-                            width: 20,
-                            height: 20,
+                            width: 22,
+                            height: 22,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
                           )
-                        : const Text('Save Changes'),
+                        : const Text(
+                            'Save Changes',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
                   ),
                 ),
               ],
@@ -895,9 +915,13 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      addressCtrl.dispose();
+      phoneCtrl.dispose();
+      emailCtrl.dispose();
+    });
   }
-
 }
 
 class _SettingItem {

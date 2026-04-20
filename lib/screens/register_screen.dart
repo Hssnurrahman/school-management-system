@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../services/auth_service.dart';
+import '../theme/app_theme.dart';
 import '../utils/app_snackbar.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
 
   @override
   void dispose() {
@@ -161,20 +163,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _confirmPasswordController,
-                            obscureText: !_isPasswordVisible,
-                            decoration: const InputDecoration(
+                            obscureText: !_isConfirmPasswordVisible,
+                            decoration: InputDecoration(
                               hintText: '••••••••',
-                              prefixIcon: Icon(Icons.lock_outline_rounded, size: 20),
+                              prefixIcon: const Icon(
+                                  Icons.lock_outline_rounded,
+                                  size: 20),
+                              suffixIcon: IconButton(
+                                onPressed: () => setState(() =>
+                                    _isConfirmPasswordVisible =
+                                        !_isConfirmPasswordVisible),
+                                icon: Icon(
+                                  _isConfirmPasswordVisible
+                                      ? Icons.visibility_rounded
+                                      : Icons.visibility_off_rounded,
+                                  size: 20,
+                                ),
+                              ),
                             ),
                             validator: (v) => (v != _passwordController.text)
                                 ? 'Passwords do not match'
                                 : null,
                           ),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 24),
                           SizedBox(
                             width: double.infinity,
+                            height: 48,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _register,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryTeal,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
                               child: _isLoading
                                   ? const SizedBox(
                                       height: 20,

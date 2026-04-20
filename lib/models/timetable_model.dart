@@ -5,6 +5,7 @@ class TimetableEntry {
   final String endTime;
   final String subject;
   final String room;
+  final String className;
 
   TimetableEntry({
     this.id,
@@ -13,5 +14,6 @@ class TimetableEntry {
     required this.endTime,
     required this.subject,
     required this.room,
+    this.className = 'All',
   });
 }

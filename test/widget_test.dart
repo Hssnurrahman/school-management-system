@@ -10,6 +10,7 @@ import 'package:schoolify/models/library_book.dart';
 import 'package:schoolify/models/transport_route.dart';
 import 'package:schoolify/models/user_model.dart';
 import 'package:schoolify/models/user_role.dart';
+import 'package:schoolify/services/database_service.dart';
 import 'package:schoolify/utils/app_snackbar.dart';
 import 'package:schoolify/utils/date_utils.dart';
 import 'package:schoolify/utils/grade_utils.dart';
@@ -89,6 +90,24 @@ void main() {
       expect(updated.primaryRole, UserRole.parent);
     });
 
+    test('fromJson: unknown role falls back to student (least privileged)', () {
+      final user = UserModel.fromJson({
+        'id': 'u',
+        'name': 'X',
+        'email': 'x@s.com',
+        'role': 'superuser',
+      });
+      expect(user.primaryRole, UserRole.student);
+    });
+
+    test('fromJson: missing required fields become empty strings', () {
+      final user = UserModel.fromJson({'role': 'teacher'});
+      expect(user.id, '');
+      expect(user.name, '');
+      expect(user.email, '');
+      expect(user.primaryRole, UserRole.teacher);
+    });
+
     test('isActive defaults to true when null', () {
       final json = {
         'id': 'u6',
@@ -99,6 +118,95 @@ void main() {
       };
       final user = UserModel.fromJson(json);
       expect(user.isActive, true);
+    });
+  });
+
+  group('isLastActiveOwner guardrail', () {
+    UserModel owner(String id, {bool active = true}) => UserModel(
+          id: id,
+          name: id,
+          email: '$id@s.com',
+          primaryRole: UserRole.owner,
+          isActive: active,
+        );
+    UserModel principal(String id) => UserModel(
+          id: id,
+          name: id,
+          email: '$id@s.com',
+          primaryRole: UserRole.principal,
+        );
+
+    test('returns false when target is not owner', () {
+      final p = principal('p1');
+      expect(isLastActiveOwner(p, [p, owner('o1')]), isFalse);
+    });
+
+    test('returns true when target is the only active owner', () {
+      final o = owner('o1');
+      expect(isLastActiveOwner(o, [o, principal('p1')]), isTrue);
+    });
+
+    test('returns false when another active owner exists', () {
+      final o1 = owner('o1');
+      final o2 = owner('o2');
+      expect(isLastActiveOwner(o1, [o1, o2]), isFalse);
+    });
+
+    test('ignores inactive owners when counting backups', () {
+      final o1 = owner('o1');
+      final o2 = owner('o2', active: false);
+      expect(isLastActiveOwner(o1, [o1, o2]), isTrue);
+    });
+
+    test('returns true when list only contains the target owner', () {
+      final o = owner('solo');
+      expect(isLastActiveOwner(o, [o]), isTrue);
+    });
+  });
+
+  group('AuditEntry', () {
+    test('fromJson/toJson roundtrip preserves metadata', () {
+      final entry = AuditEntry(
+        id: 'a1',
+        actorId: 'u1',
+        actorName: 'Owner One',
+        actorRole: 'owner',
+        action: 'fee.mark_paid',
+        targetType: 'fee',
+        targetId: 'f1',
+        timestamp: DateTime(2026, 4, 20, 14, 30),
+        metadata: {'amount': 500.0, 'reference': 'TXN123'},
+      );
+      final restored = AuditEntry.fromJson(entry.toJson());
+      expect(restored.id, 'a1');
+      expect(restored.action, 'fee.mark_paid');
+      expect(restored.actorRole, 'owner');
+      expect(restored.metadata['amount'], 500.0);
+      expect(restored.metadata['reference'], 'TXN123');
+      expect(restored.timestamp, DateTime(2026, 4, 20, 14, 30));
+    });
+
+    test('fromJson tolerates missing optional fields', () {
+      final restored = AuditEntry.fromJson({
+        'id': 'a2',
+        'action': 'user.create',
+        'targetType': 'user',
+      });
+      expect(restored.id, 'a2');
+      expect(restored.actorId, '');
+      expect(restored.metadata, isEmpty);
+    });
+  });
+
+  group('LastOwnerException', () {
+    test('toString exposes the message', () {
+      const e = LastOwnerException('Cannot demote the last active owner.');
+      expect(e.toString(), 'Cannot demote the last active owner.');
+    });
+
+    test('is an Exception', () {
+      const e = LastOwnerException('msg');
+      expect(e, isA<Exception>());
     });
   });
 

@@ -58,43 +58,41 @@ class UserModel {
     );
   }
 
+  /// Parses a role name to UserRole. Unknown names default to the least
+  /// privileged role (student) to avoid accidental privilege escalation.
+  static UserRole _parseRole(Object? raw) {
+    if (raw == null) return UserRole.student;
+    final name = raw.toString();
+    for (final r in UserRole.values) {
+      if (r.name == name) return r;
+    }
+    return UserRole.student;
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final rolesRaw = json['additionalRoles'];
     List<UserRole> additionalRoles = [];
     if (rolesRaw is List && rolesRaw.isNotEmpty) {
-      additionalRoles = rolesRaw
-          .map((e) => UserRole.values.firstWhere(
-                (r) => r.name == e.toString(),
-                orElse: () => UserRole.teacher,
-              ))
-          .toList();
+      additionalRoles = rolesRaw.map(_parseRole).toList();
     } else if (rolesRaw is String && rolesRaw.isNotEmpty) {
       // backward-compat: old comma-separated format
-      additionalRoles = rolesRaw
-          .split(',')
-          .map((r) => UserRole.values.firstWhere(
-                (role) => role.name == r.trim(),
-                orElse: () => UserRole.teacher,
-              ))
-          .toList();
+      additionalRoles =
+          rolesRaw.split(',').map((r) => _parseRole(r.trim())).toList();
     }
     return UserModel(
-      id: json['id'],
-      name: json['name'],
-      email: json['email'],
-      primaryRole: UserRole.values.firstWhere(
-        (e) => e.name == json['role'],
-        orElse: () => UserRole.teacher,
-      ),
+      id: (json['id'] ?? '') as String,
+      name: (json['name'] ?? '') as String,
+      email: (json['email'] ?? '') as String,
+      primaryRole: _parseRole(json['role']),
       additionalRoles: additionalRoles,
       isActive: json['isActive'] == null
           ? true
           : (json['isActive'] == true || json['isActive'] == 1),
-      phone: json['phone'],
-      address: json['address'],
-      profileImageUrl: json['profileImageUrl'],
-      className: json['className'],
-      subject: json['subject'],
+      phone: json['phone'] as String?,
+      address: json['address'] as String?,
+      profileImageUrl: json['profileImageUrl'] as String?,
+      className: json['className'] as String?,
+      subject: json['subject'] as String?,
     );
   }
 

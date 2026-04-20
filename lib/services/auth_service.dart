@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:mailer/mailer.dart';
-import 'package:mailer/smtp_server.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase_options.dart';
 import '../models/user_model.dart';
@@ -45,14 +43,18 @@ class AuthService extends ChangeNotifier {
     if (_currentUser == null) return;
     final prefs = await SharedPreferences.getInstance();
     final roleName = prefs.getString(_effectiveRoleKey);
-    if (roleName != null) {
-      try {
-        final role = UserRole.values.firstWhere((r) => r.name == roleName);
-        if (role == _currentUser!.primaryRole ||
-            _currentUser!.additionalRoles.contains(role)) {
-          _effectiveRole = role;
-        }
-      } catch (_) {}
+    if (roleName == null) return;
+    UserRole? role;
+    for (final r in UserRole.values) {
+      if (r.name == roleName) {
+        role = r;
+        break;
+      }
+    }
+    if (role == null) return;
+    if (role == _currentUser!.primaryRole ||
+        _currentUser!.additionalRoles.contains(role)) {
+      _effectiveRole = role;
     }
   }
 
@@ -72,13 +74,16 @@ class AuthService extends ChangeNotifier {
     if (uid == null) return null;
     try {
       final users = await dbService.getUsers();
-      final user = users.firstWhere((u) => u.id == uid);
+      final idx = users.indexWhere((u) => u.id == uid);
+      if (idx == -1) return null;
+      final user = users[idx];
       if (!user.isActive) return null;
       _currentUser = user;
       await restoreEffectiveRole();
       notifyListeners();
       return _currentUser;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('restoreSession failed: $e');
       return null;
     }
   }
@@ -86,13 +91,13 @@ class AuthService extends ChangeNotifier {
   Future<void> refreshCurrentUser() async {
     if (_currentUser == null) return;
     final users = await dbService.getUsers();
-    try {
-      final user = users.firstWhere((u) => u.id == _currentUser!.id);
-      if (user.isActive) {
-        _currentUser = user;
-        notifyListeners();
-      }
-    } catch (_) {}
+    final idx = users.indexWhere((u) => u.id == _currentUser!.id);
+    if (idx == -1) return;
+    final user = users[idx];
+    if (user.isActive) {
+      _currentUser = user;
+      notifyListeners();
+    }
   }
 
   // ── Login ───────────────────────────────────────────────────────────────────
@@ -112,7 +117,12 @@ class AuthService extends ChangeNotifier {
       }
 
       final users = await dbService.getUsers();
-      final user = users.firstWhere((u) => u.id == uid);
+      final idx = users.indexWhere((u) => u.id == uid);
+      if (idx == -1) {
+        if (!_isLinux) await _auth.signOut();
+        return 'Account not found. Please contact an administrator.';
+      }
+      final user = users[idx];
 
       if (!user.isActive) {
         if (!_isLinux) await _auth.signOut();
@@ -140,10 +150,14 @@ class AuthService extends ChangeNotifier {
           e.code == 'invalid-credential') { return null; }
       return e.message ?? 'Login failed.';
     } catch (e) {
-      if (e.toString().contains('INVALID_PASSWORD') ||
-          e.toString().contains('EMAIL_NOT_FOUND') ||
-          e.toString().contains('INVALID_LOGIN_CREDENTIALS')) { return null; }
-      return null;
+      final s = e.toString();
+      if (s.contains('INVALID_PASSWORD') ||
+          s.contains('EMAIL_NOT_FOUND') ||
+          s.contains('INVALID_LOGIN_CREDENTIALS')) {
+        return null;
+      }
+      debugPrint('Login failed: $e');
+      return 'Login failed: $e';
     }
   }
 
@@ -243,37 +257,16 @@ class AuthService extends ChangeNotifier {
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   Future<bool> hasAdmin() async {
-    final users = await dbService.getUsers();
-    return users.any((u) =>
-        u.primaryRole == UserRole.owner ||
-        u.primaryRole == UserRole.principal);
+    return dbService.hasAnyAdmin();
   }
 
-  Future<String?> resetPassword({
-    required String email,
-    required String senderEmail,
-    required String senderAppPassword,
-  }) async {
+  Future<String?> resetPassword({required String email}) async {
     try {
       if (_isLinux) {
         await _sendPasswordResetViaRest(email.trim().toLowerCase());
       } else {
         await _auth.sendPasswordResetEmail(email: email.trim().toLowerCase());
       }
-
-      try {
-        final smtpServer = gmail(senderEmail, senderAppPassword);
-        final message = Message()
-          ..from = Address(senderEmail, 'Schoolify')
-          ..recipients.add(email)
-          ..subject = 'Your Schoolify Password Reset'
-          ..text = 'Hello,\n\n'
-              'A password reset link has been sent to $email.\n'
-              'Please check your inbox and follow the link to reset your password.\n\n'
-              '– Schoolify';
-        await send(message, smtpServer);
-      } catch (_) {}
-
       return null;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') return 'No account found with that email.';
@@ -287,11 +280,21 @@ class AuthService extends ChangeNotifier {
     final url = Uri.parse(
       'https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=$_webApiKey',
     );
-    await http.post(
+    final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'requestType': 'PASSWORD_RESET', 'email': email}),
     );
+    if (response.statusCode >= 200 && response.statusCode < 300) return;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final message =
+        (body['error'] as Map?)?['message']?.toString() ?? 'UNKNOWN_ERROR';
+    if (message.startsWith('EMAIL_NOT_FOUND')) {
+      throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'No account found with that email.');
+    }
+    throw FirebaseAuthException(code: 'reset-failed', message: message);
   }
 
   // ── Logout ───────────────────────────────────────────────────────────────────

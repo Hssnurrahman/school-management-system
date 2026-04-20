@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/fee_model.dart';
+import '../models/user_role.dart';
+import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
+import '../widgets/shimmer_box.dart';
 import 'finance_summary_screen.dart';
 
 class FeesScreen extends StatefulWidget {
@@ -62,6 +65,8 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final totalPending = _fees.where((f) => !f.isPaid).fold(0.0, (sum, f) => sum + f.amount);
+    final canManage =
+        (authService.effectiveRole ?? authService.currentUser?.primaryRole) == UserRole.owner;
 
     return Scaffold(
       body: CustomScrollView(
@@ -146,7 +151,7 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
             ),
           ),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -157,7 +162,11 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
                     final animIdx = index < 10 ? index : 9;
                     return FadeTransition(
                       opacity: _fadeAnimations[animIdx],
-                      child: _FeeCard(fee: fee, isDark: isDark, onPay: () => _showPaymentSheet(context, fee)),
+                      child: _FeeCard(
+                        fee: fee,
+                        isDark: isDark,
+                        onPay: canManage ? () => _showPaymentSheet(context, fee) : null,
+                      ),
                     );
                   },
                   childCount: _filteredFees.length,
@@ -167,13 +176,15 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddFeeSheet,
-        backgroundColor: const Color(0xFF14B8A6),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Invoice', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
+      floatingActionButton: canManage
+          ? FloatingActionButton.extended(
+              onPressed: _showAddFeeSheet,
+              backgroundColor: const Color(0xFF14B8A6),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add Invoice', style: TextStyle(fontWeight: FontWeight.w700)),
+            )
+          : null,
     );
   }
 
@@ -233,6 +244,17 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
                 final updated = fee.copyWith(isPaid: true);
                 final messenger = ScaffoldMessenger.of(context);
                 await dbService.updateFee(updated);
+                await dbService.writeAudit(
+                  actor: authService.currentUser,
+                  action: 'fee.mark_paid',
+                  targetType: 'fee',
+                  targetId: updated.id,
+                  metadata: {
+                    'amount': updated.amount,
+                    'studentName': updated.studentName,
+                    'reference': refController.text,
+                  },
+                );
                 if (!context.mounted) return;
                 Navigator.pop(context);
                 await _loadFees();
@@ -256,7 +278,9 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
             const SizedBox(height: 8),
           ],
         ),
-      );
+      ).whenComplete(() {
+        refController.dispose();
+      });
   }
 
   void _showAddFeeSheet() {
@@ -309,6 +333,18 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
                         studentName: studentController.text,
                       );
                       await dbService.insertFee(fee);
+                      await dbService.writeAudit(
+                        actor: authService.currentUser,
+                        action: 'fee.create',
+                        targetType: 'fee',
+                        targetId: fee.id,
+                        metadata: {
+                          'amount': fee.amount,
+                          'title': fee.title,
+                          'studentName': fee.studentName,
+                          'category': fee.category.name,
+                        },
+                      );
                       if (context.mounted) Navigator.pop(context);
                       await _loadFees();
                     }
@@ -320,13 +356,17 @@ class _FeesScreenState extends State<FeesScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
-        );
+        ).whenComplete(() {
+          titleController.dispose();
+          amountController.dispose();
+          studentController.dispose();
+        });
   }
 }
 
 class _FeeCard extends StatelessWidget {
   final Fee fee;
-  final VoidCallback onPay;
+  final VoidCallback? onPay;
   final bool isDark;
 
   const _FeeCard({required this.fee, required this.onPay, required this.isDark});
@@ -395,7 +435,7 @@ class _FeeCard extends StatelessWidget {
                   Text('Due: ${fee.dueDate.day}/${fee.dueDate.month}/${fee.dueDate.year}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8))),
                 ],
               ),
-              if (!fee.isPaid)
+              if (!fee.isPaid && onPay != null)
                 GestureDetector(
                   onTap: onPay,
                   child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(10)), child: const Text('PAY NOW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12))),

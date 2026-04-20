@@ -26,12 +26,21 @@ class InventoryItem {
         'status': status.name,
       };
 
+  static InventoryStatus _parseStatus(Object? raw) {
+    if (raw == null) return InventoryStatus.inStock;
+    final name = raw.toString();
+    for (final s in InventoryStatus.values) {
+      if (s.name == name) return s;
+    }
+    return InventoryStatus.inStock;
+  }
+
   factory InventoryItem.fromJson(Map<String, dynamic> json) => InventoryItem(
-        id: json['id'],
-        name: json['name'],
-        category: json['category'],
-        quantity: json['quantity'],
-        unit: json['unit'],
-        status: InventoryStatus.values.firstWhere((e) => e.name == json['status']),
+        id: (json['id'] ?? '') as String,
+        name: (json['name'] ?? '') as String,
+        category: (json['category'] ?? '') as String,
+        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+        unit: (json['unit'] ?? '') as String,
+        status: _parseStatus(json['status']),
       );
 }

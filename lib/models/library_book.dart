@@ -53,12 +53,14 @@ class LibraryBook {
       dueDate = DateTime.tryParse(rawDue);
     }
     return LibraryBook(
-      id: json['id'],
-      title: json['title'],
-      author: json['author'],
-      isbn: json['isbn'],
-      category: json['category'],
-      isAvailable: json['isAvailable'] == 1 || json['isAvailable'] == true,
+      id: (json['id'] ?? '') as String,
+      title: (json['title'] ?? '') as String,
+      author: (json['author'] ?? '') as String,
+      isbn: (json['isbn'] ?? '') as String,
+      category: (json['category'] ?? '') as String,
+      isAvailable: json['isAvailable'] == null
+          ? true
+          : (json['isAvailable'] == 1 || json['isAvailable'] == true),
       dueDate: dueDate,
     );
   }

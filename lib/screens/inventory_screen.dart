@@ -4,6 +4,7 @@ import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
 import '../widgets/confirm_delete_dialog.dart';
+import '../widgets/shimmer_box.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -114,7 +115,12 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      categoryController.dispose();
+      quantityController.dispose();
+      unitController.dispose();
+    });
   }
 
   @override
@@ -141,7 +147,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
           ),
           SliverToBoxAdapter(child: _buildSummaryCards(isDark)),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -193,7 +199,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       message: 'Remove "${item.name}" from inventory?',
       onConfirm: () async {
         await dbService.deleteInventoryItem(item.id);
-        await _loadInventory();
+        if (mounted) await _loadInventory();
       },
     );
   }

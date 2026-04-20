@@ -35,13 +35,28 @@ class NotificationModel {
         'isRead': isRead ? 1 : 0,
       };
 
+  static DateTime _parseDate(Object? raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is DateTime) return raw;
+    return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+  }
+
+  static NotificationType _parseType(Object? raw) {
+    if (raw == null) return NotificationType.system;
+    final name = raw.toString();
+    for (final t in NotificationType.values) {
+      if (t.name == name) return t;
+    }
+    return NotificationType.system;
+  }
+
   factory NotificationModel.fromJson(Map<String, dynamic> json) =>
       NotificationModel(
-        id: json['id'],
-        title: json['title'],
-        description: json['description'],
-        timestamp: DateTime.parse(json['timestamp']),
-        type: NotificationType.values.firstWhere((e) => e.name == json['type']),
+        id: (json['id'] ?? '') as String,
+        title: (json['title'] ?? '') as String,
+        description: (json['description'] ?? '') as String,
+        timestamp: _parseDate(json['timestamp']),
+        type: _parseType(json['type']),
         isRead: json['isRead'] == 1 || json['isRead'] == true,
       );
 }

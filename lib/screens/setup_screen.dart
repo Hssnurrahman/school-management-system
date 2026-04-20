@@ -602,6 +602,7 @@ class _TeacherClassesPageState extends State<_TeacherClassesPage> {
 
   Future<void> _loadClasses() async {
     final classes = await dbService.getClasses();
+    if (!mounted) return;
     setState(() {
       _availableClasses = classes.map((c) => c.name).toList();
       _isLoading = false;
@@ -712,6 +713,7 @@ class _TeacherStudentsPageState extends State<_TeacherStudentsPage> {
 
   Future<void> _loadClasses() async {
     final classes = await dbService.getClasses();
+    if (!mounted) return;
     setState(() {
       _availableClasses = classes.map((c) => c.name).toList();
     });

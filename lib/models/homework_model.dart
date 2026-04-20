@@ -46,13 +46,19 @@ class Homework {
         'className': className,
       };
 
+  static DateTime _parseDate(Object? raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is DateTime) return raw;
+    return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+  }
+
   factory Homework.fromJson(Map<String, dynamic> json) => Homework(
-        id: json['id'],
-        subject: json['subject'],
-        title: json['title'],
-        dueDate: DateTime.parse(json['dueDate']),
-        description: json['description'],
+        id: json['id'] as String?,
+        subject: (json['subject'] ?? '') as String,
+        title: (json['title'] ?? '') as String,
+        dueDate: _parseDate(json['dueDate']),
+        description: (json['description'] ?? '') as String,
         isCompleted: json['isCompleted'] == 1 || json['isCompleted'] == true,
-        className: json['className'],
+        className: json['className'] as String?,
       );
 }

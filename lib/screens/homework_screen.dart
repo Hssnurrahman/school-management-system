@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
+import '../widgets/shimmer_box.dart';
 
 class HomeworkScreen extends StatefulWidget {
   final UserModel? teacher;
@@ -54,6 +55,7 @@ class _HomeworkScreenState extends State<HomeworkScreen>
         subjects = allSubjects.where((s) => teacherSubjectNames.contains(s.name)).toList();
       }
     }
+    if (!mounted) return;
     setState(() {
       _subjects = subjects;
     });
@@ -226,7 +228,11 @@ class _HomeworkScreenState extends State<HomeworkScreen>
               ),
             ),
           ),
-        );
+        ).whenComplete(() {
+          titleController.dispose();
+          subjectController.dispose();
+          descController.dispose();
+        });
   }
 
   @override
@@ -306,9 +312,7 @@ class _HomeworkScreenState extends State<HomeworkScreen>
             ),
           ),
           if (_isLoading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const ShimmerListSkeleton(asSliver: true)
           else if (_assignments.isEmpty)
             SliverFillRemaining(
               child: Center(
@@ -445,7 +449,7 @@ class _HomeworkScreenState extends State<HomeworkScreen>
                 );
                 await dbService.updateHomework(updated);
                 if (context.mounted) Navigator.pop(context);
-                await _loadHomework();
+                if (mounted) await _loadHomework();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: homework.isCompleted

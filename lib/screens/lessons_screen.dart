@@ -3,6 +3,7 @@ import '../models/lesson_model.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
+import '../widgets/shimmer_box.dart';
 
 class LessonsScreen extends StatefulWidget {
   const LessonsScreen({super.key});
@@ -98,7 +99,12 @@ class _LessonsScreenState extends State<LessonsScreen> {
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      titleController.dispose();
+      descController.dispose();
+      subjectController.dispose();
+      classController.dispose();
+    });
   }
 
   @override
@@ -124,7 +130,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
             ),
           ),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -161,7 +167,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
               final nav = Navigator.of(context);
               await dbService.deleteLesson(lesson.id);
               if (context.mounted) nav.pop();
-              await _loadLessons();
+              if (mounted) await _loadLessons();
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete'),

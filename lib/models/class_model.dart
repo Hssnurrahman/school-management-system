@@ -22,10 +22,26 @@ class ClassModel {
   };
 
   factory ClassModel.fromJson(Map<String, dynamic> json) => ClassModel(
-    id: json['id'],
-    name: json['name'],
-    teacherName: json['teacherName'],
-    studentCount: json['studentCount'],
-    roomNumber: json['roomNumber'],
+    id: (json['id'] ?? '') as String,
+    name: (json['name'] ?? '') as String,
+    teacherName: (json['teacherName'] ?? '') as String,
+    studentCount: (json['studentCount'] as num?)?.toInt() ?? 0,
+    roomNumber: (json['roomNumber'] ?? '') as String,
   );
+
+  ClassModel copyWith({
+    String? id,
+    String? name,
+    String? teacherName,
+    int? studentCount,
+    String? roomNumber,
+  }) {
+    return ClassModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      teacherName: teacherName ?? this.teacherName,
+      studentCount: studentCount ?? this.studentCount,
+      roomNumber: roomNumber ?? this.roomNumber,
+    );
+  }
 }

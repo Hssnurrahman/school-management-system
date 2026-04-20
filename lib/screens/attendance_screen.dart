@@ -4,9 +4,9 @@ import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
-import '../widgets/filter_chip_button.dart';
 import '../widgets/header_stat_card.dart';
 import '../widgets/search_bar_field.dart';
+import '../widgets/shimmer_box.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final UserModel? user;
@@ -155,6 +155,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   void _selectDate(DateTime date) async {
     if (!await _confirmDiscard()) return;
+    if (!mounted) return;
     setState(() {
       _selectedDate = date;
       _weekStart = _getWeekStart(date);
@@ -163,10 +164,32 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     _loadAttendance();
   }
 
+  Future<void> _pickDate() async {
+    if (!await _confirmDiscard()) return;
+    if (!mounted) return;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+      selectableDayPredicate: (date) => date.weekday != DateTime.sunday,
+    );
+    if (picked != null) {
+      if (!mounted) return;
+      setState(() {
+        _selectedDate = picked;
+        _weekStart = _getWeekStart(picked);
+        _hasUnsavedChanges = false;
+      });
+      _loadAttendance();
+    }
+  }
+
   void _selectClass(String? className) async {
     if (_hasUnsavedChanges && _selectedClass != className) {
       if (!await _confirmDiscard()) return;
     }
+    if (!mounted) return;
     setState(() {
       _selectedClass = _selectedClass == className ? null : className;
       _hasUnsavedChanges = false;
@@ -437,8 +460,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
 
             if (_isLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildAttendanceSkeleton(isDark),
+                    childCount: 6,
+                  ),
+                ),
               )
             else ...[
               // ── Date Picker Strip ──────────────────────────────────────────
@@ -467,17 +496,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          FilterChipButton(
+                          _buildClassFilterChip(
                             label: 'All',
+                            icon: Icons.apps_rounded,
+                            count: _countForClass(null),
                             isSelected: _selectedClass == null,
+                            isDark: isDark,
                             onTap: () => _selectClass(null),
                           ),
                           ..._availableClasses.map(
                             (c) => Padding(
                               padding: const EdgeInsets.only(left: 8),
-                              child: FilterChipButton(
+                              child: _buildClassFilterChip(
                                 label: c,
+                                icon: Icons.class_rounded,
+                                count: _countForClass(c),
                                 isSelected: _selectedClass == c,
+                                isDark: isDark,
                                 onTap: () => _selectClass(c),
                               ),
                             ),
@@ -565,13 +600,27 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
           Expanded(
-            child: Text(
-              _formatMonthYear(_weekStart),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+            child: GestureDetector(
+              onTap: _pickDate,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _formatMonthYear(_weekStart),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.calendar_today_rounded,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
+                ],
               ),
             ),
           ),
@@ -587,12 +636,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   Widget _buildDateStrip() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 80,
       margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: List.generate(7, (index) {
           final date = _weekStart.add(Duration(days: index));
           final isSelected = date.day == _selectedDate.day &&
@@ -612,9 +662,124 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             isSelected: isSelected,
             isToday: isToday,
             hasRecords: hasRecords,
+            isDark: isDark,
             onTap: () => _selectDate(date),
           );
         }),
+      ),
+    );
+  }
+
+  int _countForClass(String? className) {
+    if (className == null) return _allStudents.length;
+    return _allStudents
+        .where((a) => _studentClasses[a.studentId] == className)
+        .length;
+  }
+
+  Widget _buildClassFilterChip({
+    required String label,
+    required IconData icon,
+    required int count,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    const accent = Color(0xFF2563EB);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? accent
+              : (isDark ? const Color(0xFF1E293B) : Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? accent
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.grey.shade300),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.22)
+                    : accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : accent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceSkeleton(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : const Color(0xFFE8EDF5),
+        ),
+      ),
+      child: Row(
+        children: [
+          const ShimmerBox(width: 44, height: 44, borderRadius: 12),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                ShimmerBox(width: 140, height: 13),
+                SizedBox(height: 8),
+                ShimmerBox(width: 90, height: 10),
+              ],
+            ),
+          ),
+          const ShimmerBox(width: 88, height: 32, borderRadius: 10),
+        ],
       ),
     );
   }
@@ -640,6 +805,7 @@ class _DateStripItem extends StatelessWidget {
   final bool isSelected;
   final bool isToday;
   final bool hasRecords;
+  final bool isDark;
   final VoidCallback onTap;
 
   const _DateStripItem({
@@ -648,11 +814,29 @@ class _DateStripItem extends StatelessWidget {
     required this.isSelected,
     required this.isToday,
     required this.hasRecords,
+    required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Color selectedBg = const Color(0xFF2563EB);
+    final Color unselectedBg = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : const Color(0xFFF1F5F9);
+    final Color unselectedBorder = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : const Color(0xFFE2E8F0);
+    final Color dayColor = isSelected
+        ? Colors.white70
+        : (isDark ? Colors.white70 : const Color(0xFF64748B));
+    final Color dateColor = isSelected
+        ? Colors.white
+        : (isDark ? Colors.white : const Color(0xFF0F172A));
+    final Color dotColor = isSelected
+        ? Colors.white
+        : (isDark ? Colors.white70 : const Color(0xFF10B981));
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -660,13 +844,14 @@ class _DateStripItem extends StatelessWidget {
         width: 44,
         height: 72,
         decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.white
-              : Colors.white.withValues(alpha: 0.1),
+          color: isSelected ? selectedBg : unselectedBg,
           borderRadius: BorderRadius.circular(12),
-          border: isToday && !isSelected
-              ? Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5)
-              : null,
+          border: Border.all(
+            color: isToday && !isSelected
+                ? const Color(0xFF2563EB).withValues(alpha: 0.6)
+                : unselectedBorder,
+            width: isToday && !isSelected ? 1.5 : 1,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -674,7 +859,7 @@ class _DateStripItem extends StatelessWidget {
             Text(
               dayName,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF2563EB) : Colors.white70,
+                color: dayColor,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -683,7 +868,7 @@ class _DateStripItem extends StatelessWidget {
             Text(
               date,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF1E40AF) : Colors.white,
+                color: dateColor,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
@@ -694,9 +879,7 @@ class _DateStripItem extends StatelessWidget {
               width: 6,
               height: 6,
               decoration: BoxDecoration(
-                color: isSelected
-                    ? (hasRecords ? const Color(0xFF10B981) : Colors.transparent)
-                    : (hasRecords ? Colors.white70 : Colors.transparent),
+                color: hasRecords ? dotColor : Colors.transparent,
                 shape: BoxShape.circle,
               ),
             ),

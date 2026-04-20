@@ -30,14 +30,20 @@ class Lesson {
         'attachmentUrl': attachmentUrl,
       };
 
+  static DateTime _parseDate(Object? raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is DateTime) return raw;
+    return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+  }
+
   factory Lesson.fromJson(Map<String, dynamic> json) => Lesson(
-        id: json['id'],
-        title: json['title'],
-        description: json['description'],
-        subject: json['subject'],
-        className: json['className'],
-        teacherName: json['teacherName'],
-        date: DateTime.parse(json['date']),
-        attachmentUrl: json['attachmentUrl'],
+        id: (json['id'] ?? '') as String,
+        title: (json['title'] ?? '') as String,
+        description: (json['description'] ?? '') as String,
+        subject: (json['subject'] ?? '') as String,
+        className: (json['className'] ?? '') as String,
+        teacherName: (json['teacherName'] ?? '') as String,
+        date: _parseDate(json['date']),
+        attachmentUrl: json['attachmentUrl'] as String?,
       );
 }

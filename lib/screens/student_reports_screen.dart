@@ -9,8 +9,10 @@ import '../models/user_role.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/report_pdf_service.dart';
+import '../theme/app_theme.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/legend_item.dart';
+import '../widgets/shimmer_box.dart';
 import 'student_attendance_screen.dart';
 
 enum _ReportSort { nameAZ, averageHigh, attendanceHigh }
@@ -29,6 +31,8 @@ class StudentReportsScreen extends StatefulWidget {
 class _StudentReportsScreenState extends State<StudentReportsScreen> {
   List<_StudentInfo> _students = [];
   List<String> _classOptions = [];
+  Map<String, int> _classCounts = const {};
+  int _totalStudents = 0;
   String? _classFilter;
   String _search = '';
   _ReportSort _sort = _ReportSort.averageHigh;
@@ -54,6 +58,25 @@ class _StudentReportsScreenState extends State<StudentReportsScreen> {
     final allowedClasses = await dbService.getClassesForUser(userId, role);
 
     _classOptions = List<String>.from(allowedClasses)..sort();
+
+    final counts = <String, int>{};
+    var total = 0;
+    for (final u in allStudents) {
+      if (u.primaryRole != UserRole.student) continue;
+      if (allowedClasses.isNotEmpty &&
+          (u.className == null || !allowedClasses.contains(u.className))) {
+        continue;
+      }
+      if (widget.user?.primaryRole == UserRole.student &&
+          u.id != widget.user!.id) {
+        continue;
+      }
+      total++;
+      final cls = u.className;
+      if (cls != null) counts[cls] = (counts[cls] ?? 0) + 1;
+    }
+    _classCounts = counts;
+    _totalStudents = total;
 
     final studentMap = <String, _StudentInfo>{};
 
@@ -139,6 +162,80 @@ class _StudentReportsScreenState extends State<StudentReportsScreen> {
     }
   }
 
+  Widget _buildClassFilterChip({
+    required String label,
+    required IconData icon,
+    required int count,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    const accent = Color(0xFF2563EB);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? accent
+              : (isDark ? const Color(0xFF1E293B) : Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? accent
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.grey.shade300),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.22)
+                    : accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : accent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<_StudentInfo> get _visibleStudents {
     final q = _search.trim().toLowerCase();
     if (q.isEmpty) return _students;
@@ -152,7 +249,8 @@ class _StudentReportsScreenState extends State<StudentReportsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: RefreshIndicator(
         color: const Color(0xFF0D9488),
         onRefresh: _loadStudents,
@@ -238,17 +336,21 @@ class _StudentReportsScreenState extends State<StudentReportsScreen> {
                 _classOptions.length > 1)
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 44,
+                  height: 52,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 8),
                     children: [
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: const Text('All classes'),
-                          selected: _classFilter == null,
-                          onSelected: (_) {
+                        child: _buildClassFilterChip(
+                          label: 'All classes',
+                          icon: Icons.apps_rounded,
+                          count: _totalStudents,
+                          isSelected: _classFilter == null,
+                          isDark: isDark,
+                          onTap: () {
                             setState(() => _classFilter = null);
                             _loadStudents();
                           },
@@ -257,10 +359,13 @@ class _StudentReportsScreenState extends State<StudentReportsScreen> {
                       ..._classOptions.map(
                         (c) => Padding(
                           padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(c),
-                            selected: _classFilter == c,
-                            onSelected: (_) {
+                          child: _buildClassFilterChip(
+                            label: c,
+                            icon: Icons.class_rounded,
+                            count: _classCounts[c] ?? 0,
+                            isSelected: _classFilter == c,
+                            isDark: isDark,
+                            onTap: () {
                               setState(() => _classFilter = c);
                               _loadStudents();
                             },
@@ -272,8 +377,14 @@ class _StudentReportsScreenState extends State<StudentReportsScreen> {
                 ),
               ),
             if (_isLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildStudentReportSkeleton(isDark),
+                    childCount: 6,
+                  ),
+                ),
               )
             else if (_visibleStudents.isEmpty)
               SliverFillRemaining(
@@ -326,6 +437,51 @@ class _StudentReportsScreenState extends State<StudentReportsScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => _StudentReportDetailScreen(student: student),
+      ),
+    );
+  }
+
+  Widget _buildStudentReportSkeleton(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF141E30) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : const Color(0xFFE8EDF5),
+          ),
+        ),
+        child: Row(
+          children: [
+            const ShimmerBox(width: 52, height: 52, borderRadius: 14),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const ShimmerBox(width: 140, height: 14),
+                  const SizedBox(height: 8),
+                  const ShimmerBox(width: 80, height: 10),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: const [
+                      ShimmerBox(width: 76, height: 22, borderRadius: 999),
+                      ShimmerBox(width: 84, height: 22, borderRadius: 999),
+                      ShimmerBox(width: 70, height: 22, borderRadius: 999),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const ShimmerBox(width: 46, height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -685,159 +841,345 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
   Future<void> _exportPdf() async {
     if (_isGeneratingPdf) return;
 
-    // Show remarks + format dialog before generating
+    // Show modern bottom sheet for PDF generation
     final remarksController = TextEditingController();
-    bool singlePage = false;
+    bool singlePage = true; // Default to single page (summary)
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
-            'Generate PDF Report',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Add a comment for ${widget.student.name} (optional)',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: remarksController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Good progress this term...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
+        builder: (ctx, setDlg) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bottomPadding = MediaQuery.of(ctx).viewInsets.bottom;
+          
+          return Container(
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Report Format',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              Row(
+              ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomPadding),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setDlg(() => singlePage = false),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: !singlePage
-                              ? const Color(0xFF2563EB).withValues(alpha: 0.08)
-                              : Colors.grey.shade100,
-                          border: Border.all(
-                            color: !singlePage
-                                ? const Color(0xFF2563EB)
-                                : Colors.grey.shade300,
-                            width: !singlePage ? 2 : 1,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(Icons.description_rounded,
-                                color: !singlePage
-                                    ? const Color(0xFF2563EB)
-                                    : Colors.grey,
-                                size: 28),
-                            const SizedBox(height: 6),
-                            Text('Full Report',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                  color: !singlePage
-                                      ? const Color(0xFF2563EB)
-                                      : Colors.grey.shade600,
-                                )),
-                            const SizedBox(height: 2),
-                            Text('All details,\nmulti-page',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey.shade500)),
-                          ],
-                        ),
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setDlg(() => singlePage = true),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.all(12),
+                  const SizedBox(height: 20),
+                  
+                  // Title
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: singlePage
-                              ? const Color(0xFF10B981).withValues(alpha: 0.08)
-                              : Colors.grey.shade100,
-                          border: Border.all(
-                            color: singlePage
-                                ? const Color(0xFF10B981)
-                                : Colors.grey.shade300,
-                            width: singlePage ? 2 : 1,
-                          ),
+                          color: const Color(0xFF0D9488).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        child: const Icon(
+                          Icons.picture_as_pdf_rounded,
+                          color: Color(0xFF0D9488),
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.summarize_rounded,
-                                color: singlePage
-                                    ? const Color(0xFF10B981)
-                                    : Colors.grey,
-                                size: 28),
-                            const SizedBox(height: 6),
-                            Text('Summary',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                  color: singlePage
-                                      ? const Color(0xFF10B981)
-                                      : Colors.grey.shade600,
-                                )),
+                            const Text(
+                              'Generate Report',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                             const SizedBox(height: 2),
-                            Text('Key stats,\n1 page only',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey.shade500)),
+                            Text(
+                              widget.student.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade500,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        icon: Icon(Icons.close_rounded, color: Colors.grey.shade400),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Report Format Selection
+                  Text(
+                    'Select Report Format',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Format Options
+                  Row(
+                    children: [
+                      // Summary Option
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setDlg(() => singlePage = true),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: singlePage
+                                  ? const Color(0xFF0D9488).withValues(alpha: 0.08)
+                                  : isDark
+                                      ? const Color(0xFF334155)
+                                      : Colors.grey.shade50,
+                              border: Border.all(
+                                color: singlePage
+                                    ? const Color(0xFF0D9488)
+                                    : isDark
+                                        ? const Color(0xFF475569)
+                                        : Colors.grey.shade200,
+                                width: singlePage ? 2 : 1,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: singlePage
+                                        ? const Color(0xFF0D9488).withValues(alpha: 0.15)
+                                        : isDark
+                                            ? const Color(0xFF1E293B)
+                                            : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.summarize_rounded,
+                                    color: singlePage
+                                        ? const Color(0xFF0D9488)
+                                        : Colors.grey.shade400,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Summary',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: singlePage
+                                        ? const Color(0xFF0D9488)
+                                        : isDark
+                                            ? Colors.white
+                                            : Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '1 page\nQuick overview',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.3,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Full Report Option
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setDlg(() => singlePage = false),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: !singlePage
+                                  ? const Color(0xFF2563EB).withValues(alpha: 0.08)
+                                  : isDark
+                                      ? const Color(0xFF334155)
+                                      : Colors.grey.shade50,
+                              border: Border.all(
+                                color: !singlePage
+                                    ? const Color(0xFF2563EB)
+                                    : isDark
+                                        ? const Color(0xFF475569)
+                                        : Colors.grey.shade200,
+                                width: !singlePage ? 2 : 1,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: !singlePage
+                                        ? const Color(0xFF2563EB).withValues(alpha: 0.15)
+                                        : isDark
+                                            ? const Color(0xFF1E293B)
+                                            : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.description_rounded,
+                                    color: !singlePage
+                                        ? const Color(0xFF2563EB)
+                                        : Colors.grey.shade400,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Detailed',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: !singlePage
+                                        ? const Color(0xFF2563EB)
+                                        : isDark
+                                            ? Colors.white
+                                            : Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Multi-page\nComplete report',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.3,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Teacher Remarks
+                  Text(
+                    'Teacher Remarks (Optional)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: remarksController,
+                    maxLines: 3,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Add a personalized comment about the student\'s progress...',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade400,
+                      ),
+                      filled: true,
+                      fillColor: isDark
+                          ? const Color(0xFF0F172A)
+                          : Colors.grey.shade50,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : Colors.grey.shade200,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF0D9488),
+                          width: 1.5,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.all(14),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Generate Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
+                      label: const Text(
+                        'Generate PDF',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: singlePage
+                            ? const Color(0xFF0D9488)
+                            : const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
                       ),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
             ),
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(ctx, true),
-              icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
-              label: const Text('Generate PDF'),
-              style: FilledButton.styleFrom(
-                backgroundColor: singlePage
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFF2563EB),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
-    );
+    ).whenComplete(() {
+      remarksController.dispose();
+    });
 
     if (confirmed != true || !mounted) return;
 
@@ -903,7 +1245,8 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
     final attRate = s.attendanceRate;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
           s.name,
@@ -945,7 +1288,7 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerListSkeleton()
           : RefreshIndicator(
               color: const Color(0xFF0D9488),
               onRefresh: _load,

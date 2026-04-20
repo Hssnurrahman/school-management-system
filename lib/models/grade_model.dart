@@ -19,9 +19,9 @@ class Grade {
       };
 
   factory Grade.fromJson(Map<String, dynamic> json) => Grade(
-        subject: json['subject'],
-        score: json['score'],
-        grade: json['grade'],
-        remarks: json['remarks'],
+        subject: (json['subject'] ?? '') as String,
+        score: (json['score'] ?? '') as String,
+        grade: (json['grade'] ?? '') as String,
+        remarks: (json['remarks'] ?? '') as String,
       );
 }

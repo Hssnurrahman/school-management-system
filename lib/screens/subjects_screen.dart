@@ -4,6 +4,7 @@ import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
 import '../widgets/confirm_delete_dialog.dart';
+import '../widgets/shimmer_box.dart';
 
 class SubjectsScreen extends StatefulWidget {
   const SubjectsScreen({super.key});
@@ -72,6 +73,35 @@ class _SubjectsScreenState extends State<SubjectsScreen>
   }
 
   Color _hexToColor(String hex) => Color(int.parse(hex, radix: 16));
+
+  Widget _buildSubjectSkeleton(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141E30) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : const Color(0xFFE8EDF5),
+        ),
+      ),
+      child: Row(
+        children: [
+          const ShimmerBox(width: 46, height: 46, borderRadius: 14),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: ShimmerBox(width: 140, height: 14, borderRadius: 4),
+          ),
+          const SizedBox(width: 8),
+          const ShimmerBox(width: 60, height: 22, borderRadius: 8),
+          const SizedBox(width: 8),
+          const ShimmerBox(width: 34, height: 34, borderRadius: 10),
+        ],
+      ),
+    );
+  }
 
   void _showAddSubjectSheet() {
     final nameController = TextEditingController();
@@ -185,7 +215,9 @@ class _SubjectsScreenState extends State<SubjectsScreen>
             ],
           ),
         ),
-      );
+      ).whenComplete(() {
+        nameController.dispose();
+      });
   }
 
   Future<void> _confirmDelete(SubjectModel subject) async {
@@ -238,8 +270,14 @@ class _SubjectsScreenState extends State<SubjectsScreen>
             ),
           ),
           if (_isLoading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildSubjectSkeleton(isDark),
+                  childCount: 6,
+                ),
+              ),
             )
           else if (_subjects.isEmpty)
             SliverFillRemaining(

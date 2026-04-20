@@ -3,6 +3,7 @@ import '../models/event_model.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
+import '../widgets/shimmer_box.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -123,7 +124,12 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      titleController.dispose();
+      descController.dispose();
+      locationController.dispose();
+      categoryController.dispose();
+    });
   }
 
   @override
@@ -170,7 +176,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
               ),
             ),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -187,7 +193,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
                         categoryIcon: _categoryIcon(event.category),
                         onDelete: () async {
                           await dbService.deleteEvent(event.id);
-                          await _loadEvents();
+                          if (mounted) await _loadEvents();
                         },
                       ),
                     );

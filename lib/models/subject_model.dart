@@ -16,8 +16,8 @@ class SubjectModel {
   };
 
   factory SubjectModel.fromJson(Map<String, dynamic> json) => SubjectModel(
-    id: json['id'] as String,
-    name: json['name'] as String,
+    id: (json['id'] ?? '') as String,
+    name: (json['name'] ?? '') as String,
     colorHex: (json['colorHex'] as String? ?? 'FF6366F1'),
   );
 }

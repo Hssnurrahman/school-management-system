@@ -30,14 +30,26 @@ class Event {
         'isAllDay': isAllDay ? 1 : 0,
       };
 
+  static DateTime _parseDate(Object? raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is DateTime) return raw;
+    return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+  }
+
+  static DateTime? _parseDateOrNull(Object? raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    return DateTime.tryParse(raw.toString());
+  }
+
   factory Event.fromJson(Map<String, dynamic> json) => Event(
-        id: json['id'],
-        title: json['title'],
-        description: json['description'],
-        startDate: DateTime.parse(json['startDate']),
-        endDate: json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
-        location: json['location'],
-        category: json['category'],
+        id: (json['id'] ?? '') as String,
+        title: (json['title'] ?? '') as String,
+        description: (json['description'] ?? '') as String,
+        startDate: _parseDate(json['startDate']),
+        endDate: _parseDateOrNull(json['endDate']),
+        location: (json['location'] ?? '') as String,
+        category: (json['category'] ?? '') as String,
         isAllDay: json['isAllDay'] == 1 || json['isAllDay'] == true,
       );
 }

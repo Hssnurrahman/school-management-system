@@ -52,12 +52,17 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isStaff();
       allow read: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isOwnerOrPrincipal();
-      allow update: if isOwnerOrPrincipal()
+      allow create: if isOwnerOrPrincipal()
+                    && !(request.resource.data.role in ['owner', 'principal'] && !isOwner());
+      allow update: if isOwner()
+                    || (isPrincipal()
+                        && !(resource.data.role in ['owner', 'principal'])
+                        && !(request.resource.data.role in ['owner', 'principal']))
                     || (isSignedIn() && request.auth.uid == userId
                         && !request.resource.data.diff(resource.data).affectedKeys()
-                            .hasAny(['role', 'isActive', 'additionalRoles']));
-      allow delete: if isOwnerOrPrincipal();
+                            .hasAny(['role', 'isActive', 'additionalRoles', 'email', 'id']));
+      allow delete: if isOwner()
+                    || (isPrincipal() && !(resource.data.role in ['owner', 'principal']));
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -90,7 +95,7 @@ service cloud.firestore {
       allow read: if isOwnerOrPrincipal();
       allow read: if isStudent()
                   && resource.data.studentId == request.auth.uid;
-      allow create, update, delete: if isOwnerOrPrincipal();
+      allow create, update, delete: if isOwner();
     }
 
     // ── Notices ───────────────────────────────────────────────────────────────
@@ -207,6 +212,18 @@ service cloud.firestore {
     match /teacher_class_subjects/{docId} {
       allow read: if isStaff();
       allow write: if isOwnerOrPrincipal() || isTeacher();
+    }
+
+    // ── Audit log ─────────────────────────────────────────────────────────────
+    // Append-only trail of sensitive actions (fees, roles, settings).
+    // Owner-only read. Any signed-in staff can create entries (client writes
+    // its own actions), but nobody can update or delete.
+
+    match /audit_log/{entryId} {
+      allow read: if isOwner();
+      allow create: if isStaff()
+                    && request.resource.data.actorId == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }

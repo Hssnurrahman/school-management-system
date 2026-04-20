@@ -3,6 +3,7 @@ import '../models/library_book.dart';
 import '../services/database_service.dart';
 import '../utils/app_snackbar.dart';
 import '../widgets/app_bottom_sheet.dart';
+import '../widgets/shimmer_box.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -91,7 +92,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      titleController.dispose();
+      authorController.dispose();
+      isbnController.dispose();
+      categoryController.dispose();
+    });
   }
 
   @override
@@ -148,7 +154,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           if (_isLoading)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            const ShimmerListSkeleton(asSliver: true)
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -178,7 +184,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       dueDate: !book.isAvailable ? null : DateTime.now().add(const Duration(days: 14)),
     );
     await dbService.updateBook(updated);
-    await _loadBooks();
+    if (mounted) await _loadBooks();
   }
 }
 

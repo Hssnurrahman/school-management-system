@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/attendance_model.dart';
 import '../models/class_model.dart';
 import '../models/event_model.dart';
@@ -16,6 +17,73 @@ import '../models/subject_model.dart';
 import '../models/transport_route.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
+
+class AuditEntry {
+  final String id;
+  final String actorId;
+  final String actorName;
+  final String actorRole;
+  final String action;
+  final String targetType;
+  final String? targetId;
+  final DateTime timestamp;
+  final Map<String, dynamic> metadata;
+
+  const AuditEntry({
+    required this.id,
+    required this.actorId,
+    required this.actorName,
+    required this.actorRole,
+    required this.action,
+    required this.targetType,
+    this.targetId,
+    required this.timestamp,
+    this.metadata = const {},
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'actorId': actorId,
+        'actorName': actorName,
+        'actorRole': actorRole,
+        'action': action,
+        'targetType': targetType,
+        'targetId': targetId,
+        'timestamp': timestamp.toIso8601String(),
+        'metadata': metadata,
+      };
+
+  factory AuditEntry.fromJson(Map<String, dynamic> json) => AuditEntry(
+        id: json['id'] as String,
+        actorId: (json['actorId'] ?? '') as String,
+        actorName: (json['actorName'] ?? '') as String,
+        actorRole: (json['actorRole'] ?? '') as String,
+        action: (json['action'] ?? '') as String,
+        targetType: (json['targetType'] ?? '') as String,
+        targetId: json['targetId'] as String?,
+        timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+            DateTime.now(),
+        metadata: (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const {},
+      );
+}
+
+class LastOwnerException implements Exception {
+  final String message;
+  const LastOwnerException(this.message);
+  @override
+  String toString() => message;
+}
+
+/// Pure helper: true if [target] is the only remaining active owner
+/// in [allUsers]. Used by guardrails to block demotion/deletion.
+bool isLastActiveOwner(UserModel target, List<UserModel> allUsers) {
+  if (target.primaryRole != UserRole.owner) return false;
+  final otherActiveOwners = allUsers.where((u) =>
+      u.id != target.id &&
+      u.isActive &&
+      u.primaryRole == UserRole.owner);
+  return otherActiveOwners.isEmpty;
+}
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -38,6 +106,19 @@ class DatabaseService {
     return snap.docs.map((d) => UserModel.fromJson(_snap(d))).toList();
   }
 
+  /// Returns true if at least one user with role owner or principal exists.
+  /// Uses a bounded query so it does not page the full users collection.
+  Future<bool> hasAnyAdmin() async {
+    final owners =
+        await _col('users').where('role', isEqualTo: 'owner').limit(1).get();
+    if (owners.docs.isNotEmpty) return true;
+    final principals = await _col('users')
+        .where('role', isEqualTo: 'principal')
+        .limit(1)
+        .get();
+    return principals.docs.isNotEmpty;
+  }
+
   Future<List<UserModel>> getStudentsByClass(String className) async {
     var snap = await _col('users')
         .where('role', isEqualTo: 'student')
@@ -58,10 +139,45 @@ class DatabaseService {
   }
 
   Future<void> updateUser(UserModel user) async {
+    if (user.primaryRole != UserRole.owner) {
+      final existing = await _col('users').doc(user.id).get();
+      if (existing.exists) {
+        final prev = UserModel.fromJson(_snap(existing));
+        if (prev.primaryRole == UserRole.owner && await _isLastActiveOwner(user.id)) {
+          throw const LastOwnerException('Cannot demote the last active owner.');
+        }
+      }
+    }
+    if (user.primaryRole == UserRole.owner && !user.isActive) {
+      if (await _isLastActiveOwner(user.id)) {
+        throw const LastOwnerException('Cannot deactivate the last active owner.');
+      }
+    }
     await _col('users').doc(user.id).update(user.toJson());
   }
 
+  Future<bool> _isLastActiveOwner(String userId) async {
+    final users = await getUsers();
+    final target = users.firstWhere(
+      (u) => u.id == userId,
+      orElse: () => UserModel(
+        id: userId,
+        name: '',
+        email: '',
+        primaryRole: UserRole.owner,
+      ),
+    );
+    return isLastActiveOwner(target, users);
+  }
+
   Future<void> deleteUser(String id) async {
+    final existing = await _col('users').doc(id).get();
+    if (existing.exists) {
+      final user = UserModel.fromJson(_snap(existing));
+      if (user.primaryRole == UserRole.owner && await _isLastActiveOwner(id)) {
+        throw const LastOwnerException('Cannot delete the last active owner.');
+      }
+    }
     final batch = _fs.batch();
     batch.delete(_col('users').doc(id));
 
@@ -93,6 +209,43 @@ class DatabaseService {
   }
 
   Future<void> refreshCurrentUser() async {}
+
+  // ─── AUDIT LOG ───────────────────────────────────────────────────────────────
+
+  Future<void> writeAudit({
+    required UserModel? actor,
+    required String action,
+    required String targetType,
+    String? targetId,
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    final id = '${DateTime.now().millisecondsSinceEpoch}_${action}_${targetId ?? ''}';
+    final entry = AuditEntry(
+      id: id,
+      actorId: actor?.id ?? 'unknown',
+      actorName: actor?.name ?? 'unknown',
+      actorRole: actor?.primaryRole.name ?? 'unknown',
+      action: action,
+      targetType: targetType,
+      targetId: targetId,
+      timestamp: DateTime.now(),
+      metadata: metadata,
+    );
+    try {
+      await _col('audit_log').doc(id).set(entry.toJson());
+    } catch (e) {
+      // Audit writes must never block the primary action
+      debugPrint('Audit write failed for $action: $e');
+    }
+  }
+
+  Future<List<AuditEntry>> getAuditLog({int limit = 100}) async {
+    final snap = await _col('audit_log')
+        .orderBy('timestamp', descending: true)
+        .limit(limit)
+        .get();
+    return snap.docs.map((d) => AuditEntry.fromJson(_snap(d))).toList();
+  }
 
   // ─── SETTINGS ────────────────────────────────────────────────────────────────
 
@@ -357,6 +510,21 @@ class DatabaseService {
   // ─── TEACHER CLASSES ─────────────────────────────────────────────────────────
 
   Future<void> saveTeacherClasses(String teacherId, List<String> classNames) async {
+    // Validate teacher exists
+    final teacherDoc = await _col('users').doc(teacherId).get();
+    if (!teacherDoc.exists) {
+      throw ArgumentError('Teacher with ID $teacherId does not exist');
+    }
+    
+    // Validate all classes exist
+    final existingClasses = await getClasses();
+    final existingClassNames = existingClasses.map((c) => c.name).toSet();
+    for (final cls in classNames) {
+      if (!existingClassNames.contains(cls)) {
+        throw ArgumentError('Class "$cls" does not exist');
+      }
+    }
+    
     final existing = await _col('teacher_classes').where('teacherId', isEqualTo: teacherId).get();
     final batch = _fs.batch();
     for (final d in existing.docs) { batch.delete(d.reference); }
@@ -585,18 +753,19 @@ class DatabaseService {
         endTime: r['endTime'] as String,
         subject: r['subject'] as String,
         room: r['room'] as String,
+        className: r['className'] as String? ?? 'All',
       );
     }).toList();
   }
 
-  Future<void> insertTimetableEntry(TimetableEntry entry, {String className = 'All'}) async {
+  Future<void> insertTimetableEntry(TimetableEntry entry) async {
     await _col('timetable').add({
       'day': entry.day,
       'startTime': entry.startTime,
       'endTime': entry.endTime,
       'subject': entry.subject,
       'room': entry.room,
-      'className': className,
+      'className': entry.className,
     });
   }
 

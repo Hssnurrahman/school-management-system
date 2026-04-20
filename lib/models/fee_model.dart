@@ -54,14 +54,29 @@ class Fee {
         'studentId': studentId,
       };
 
+  static FeeCategory _parseCategory(Object? raw) {
+    if (raw == null) return FeeCategory.tuition;
+    final name = raw.toString();
+    for (final c in FeeCategory.values) {
+      if (c.name == name) return c;
+    }
+    return FeeCategory.tuition;
+  }
+
+  static DateTime _parseDate(Object? raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is DateTime) return raw;
+    return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+  }
+
   factory Fee.fromJson(Map<String, dynamic> json) => Fee(
-        id: json['id'],
-        title: json['title'],
-        amount: (json['amount'] as num).toDouble(),
-        dueDate: DateTime.parse(json['dueDate']),
+        id: (json['id'] ?? '') as String,
+        title: (json['title'] ?? '') as String,
+        amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+        dueDate: _parseDate(json['dueDate']),
         isPaid: json['isPaid'] == 1 || json['isPaid'] == true,
-        category: FeeCategory.values.firstWhere((e) => e.name == json['category']),
-        studentName: json['studentName'],
-        studentId: json['studentId'],
+        category: _parseCategory(json['category']),
+        studentName: json['studentName'] as String?,
+        studentId: json['studentId'] as String?,
       );
 }

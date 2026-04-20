@@ -38,13 +38,13 @@ class TransportRoute {
       stops = [];
     }
     return TransportRoute(
-      id: json['id'],
-      routeName: json['routeName'],
-      driverName: json['driverName'],
-      driverPhone: json['driverPhone'],
-      vehicleNumber: json['vehicleNumber'],
+      id: (json['id'] ?? '') as String,
+      routeName: (json['routeName'] ?? '') as String,
+      driverName: (json['driverName'] ?? '') as String,
+      driverPhone: (json['driverPhone'] ?? '') as String,
+      vehicleNumber: (json['vehicleNumber'] ?? '') as String,
       stops: stops,
-      status: json['status'] ?? 'Active',
+      status: (json['status'] ?? 'Active') as String,
     );
   }
 }
