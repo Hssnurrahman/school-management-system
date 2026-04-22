@@ -825,8 +825,21 @@ class DatabaseService {
 
   Future<void> saveExamResults(List<ExamResult> results) async {
     final batch = _fs.batch();
+    final now = DateTime.now();
     for (final r in results) {
-      batch.set(_col('exam_results').doc(r.id), r.toJson());
+      final stamped = r.marksObtained != null
+          ? ExamResult(
+              id: r.id,
+              examId: r.examId,
+              studentId: r.studentId,
+              studentName: r.studentName,
+              marksObtained: r.marksObtained,
+              totalMarks: r.totalMarks,
+              remarks: r.remarks,
+              marksUpdatedAt: now,
+            )
+          : r;
+      batch.set(_col('exam_results').doc(r.id), stamped.toJson());
     }
     await batch.commit();
   }

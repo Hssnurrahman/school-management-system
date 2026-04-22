@@ -11,6 +11,13 @@ class ReportPdfService {
   // ─── Black & White Color Palette ────────────────────────────────────────────
   static const _black       = PdfColors.black;
   static const _white       = PdfColors.white;
+  static const _grayBg      = PdfColor.fromInt(0xFFF3F4F6);
+  static const _headerTeal  = PdfColor.fromInt(0xFF0D9488);
+  static const _headerBlue  = PdfColor.fromInt(0xFF2563EB);
+  static const _presentClr  = PdfColor.fromInt(0xFF16A34A);
+  static const _lateClr     = PdfColor.fromInt(0xFFD97706);
+  static const _absentClr   = PdfColor.fromInt(0xFFDC2626);
+  static const _totalClr    = PdfColor.fromInt(0xFF2563EB);
   static const _gray200     = PdfColor.fromInt(0xFFEEEEEE);
   static const _gray300     = PdfColor.fromInt(0xFFE0E0E0);
   static const _gray400     = PdfColor.fromInt(0xFFBDBDBD);
@@ -292,11 +299,15 @@ class ReportPdfService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        // ── Header (Black Background, White Text) ────────────────────────────
+        // ── Header (Teal→Blue Gradient, White Text) ──────────────────────────
         pw.Container(
           decoration: pw.BoxDecoration(
-            color: _black,
-            border: pw.Border.all(color: _black, width: 2),
+            gradient: const pw.LinearGradient(
+              begin: pw.Alignment.topLeft,
+              end: pw.Alignment.bottomRight,
+              colors: [_headerTeal, _headerBlue],
+            ),
+            border: pw.Border.all(color: _headerTeal, width: 2),
             borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
           ),
           padding: const pw.EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -370,9 +381,17 @@ class ReportPdfService {
         // ── Quick Stats (3 cards) ────────────────────────────────────────────
         pw.Row(
           children: [
-            _statCard('Average', avgPct != null ? '${avgPct.toStringAsFixed(1)}%' : '—'),
+            _statCard(
+              'Average',
+              avgPct != null ? '${avgPct.toStringAsFixed(1)}%' : 'N/A',
+              valueColor: _scoreColor(avgPct),
+            ),
             pw.SizedBox(width: 8),
-            _statCard('Attendance', totalDays > 0 ? '${attPct.toStringAsFixed(0)}%' : '—'),
+            _statCard(
+              'Attendance',
+              totalDays > 0 ? '${attPct.toStringAsFixed(0)}%' : 'N/A',
+              valueColor: totalDays > 0 ? _attendanceColor(attPct) : null,
+            ),
             pw.SizedBox(width: 8),
             _statCard('Exams', '$gradedCount'),
           ],
@@ -477,10 +496,10 @@ class ReportPdfService {
                   children: [
                     _boxTitle('DISCIPLINE & ACTIVITIES'),
                     pw.SizedBox(height: 8),
-                    ...disciplineData.entries.take(3).toList().asMap().entries.map((indexed) {
+                    ...disciplineData.entries.toList().asMap().entries.map((indexed) {
                       final i = indexed.key;
                       final e = indexed.value;
-                      final isLast = i == disciplineData.entries.take(3).length - 1;
+                      final isLast = i == disciplineData.entries.length - 1;
                       final rating = _ratingFromAvg(avgPct);
                       return pw.Container(
                         padding: const pw.EdgeInsets.symmetric(vertical: 6),
@@ -567,17 +586,19 @@ class ReportPdfService {
                 pw.Table(
                   border: pw.TableBorder.all(color: _gray300, width: 0.5),
                   columnWidths: const {
-                    0: pw.FlexColumnWidth(3.2),
-                    1: pw.FlexColumnWidth(2.0),
-                    2: pw.FlexColumnWidth(1.6),
-                    3: pw.FlexColumnWidth(1.0),
+                    0: pw.FlexColumnWidth(2.8),
+                    1: pw.FlexColumnWidth(1.4),
+                    2: pw.FlexColumnWidth(1.8),
+                    3: pw.FlexColumnWidth(1.4),
                     4: pw.FlexColumnWidth(0.9),
+                    5: pw.FlexColumnWidth(0.8),
                   },
                   children: [
                     pw.TableRow(
                       decoration: const pw.BoxDecoration(color: _black),
                       children: [
                         _examCell('Exam', isHeader: true),
+                        _examCell('Date', isHeader: true, align: pw.TextAlign.center),
                         _examCell('Subject', isHeader: true),
                         _examCell('Marks', isHeader: true, align: pw.TextAlign.center),
                         _examCell('%', isHeader: true, align: pw.TextAlign.center),
@@ -587,9 +608,15 @@ class ReportPdfService {
                     ...recentExams.take(3).map((r) {
                       final exam = examsById[r.examId];
                       final pct = (r.marksObtained! / r.totalMarks * 100);
+                      final d = r.marksUpdatedAt ?? exam?.date;
+                      final dateStr = d != null
+                          ? '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'
+                          : '—';
                       return pw.TableRow(
                         children: [
                           _examCell(exam?.title ?? 'Exam', bold: true),
+                          _examCell(dateStr,
+                            align: pw.TextAlign.center, muted: true),
                           _examCell(exam?.subject ?? '—', muted: true),
                           _examCell(
                             '${r.marksObtained!.toStringAsFixed(0)}/${r.totalMarks.toStringAsFixed(0)}',
@@ -609,33 +636,33 @@ class ReportPdfService {
         ),
         pw.SizedBox(height: 10),
 
-        // ── Attendance Strip (Black Background, White Text) ──────────────────
+        // ── Attendance Strip (Light Gray Background, Black Text) ─────────────
         pw.Container(
           decoration: pw.BoxDecoration(
-            color: _black,
+            color: _grayBg,
             border: pw.Border.all(color: _black, width: 1),
             borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
           ),
           padding: const pw.EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: pw.Row(children: [
-            _whiteBoxTitle('ATTENDANCE'),
+            _boxTitle('ATTENDANCE'),
             pw.SizedBox(width: 16),
-            _whiteAttendanceBadge('P', presentCount),
+            _whiteAttendanceBadge('P', presentCount, color: _presentClr),
             pw.SizedBox(width: 12),
-            _whiteAttendanceBadge('L', lateCount),
+            _whiteAttendanceBadge('L', lateCount, color: _lateClr),
             pw.SizedBox(width: 12),
-            _whiteAttendanceBadge('A', absentCount),
+            _whiteAttendanceBadge('A', absentCount, color: _absentClr),
             pw.SizedBox(width: 12),
-            _whiteAttendanceBadge('T', totalDays),
+            _whiteAttendanceBadge('T', totalDays, color: _totalClr),
             pw.Spacer(),
             pw.Container(
               padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: _white, width: 1.5),
+                border: pw.Border.all(color: _black, width: 1.5),
                 borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
               ),
               child: pw.Text('${attPct.toStringAsFixed(1)}%',
-                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: _white)),
+                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: _black)),
             ),
           ]),
         ),
@@ -715,7 +742,11 @@ class ReportPdfService {
     final grade = avgPct != null ? _computeGrade(avgPct) : null;
     return pw.Container(
       decoration: pw.BoxDecoration(
-        color: _black,
+        gradient: const pw.LinearGradient(
+          begin: pw.Alignment.topLeft,
+          end: pw.Alignment.bottomRight,
+          colors: [_headerTeal, _headerBlue],
+        ),
       ),
       padding: const pw.EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: pw.Row(
@@ -774,7 +805,7 @@ class ReportPdfService {
   }) {
     return pw.Container(
       decoration: pw.BoxDecoration(
-        color: _black,
+        color: _white,
         border: pw.Border.all(color: _black, width: 1.5),
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
       ),
@@ -782,15 +813,15 @@ class ReportPdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('Performance Overview', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: _white)),
+          pw.Text('Performance Overview', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: _black)),
           pw.SizedBox(height: 12),
           pw.Row(
             children: [
-              _whiteOverviewCard('Average Score', avgPct != null ? '${avgPct.toStringAsFixed(1)}%' : '—', avgPct != null ? _computeGrade(avgPct) : null),
+              _whiteOverviewCard('Average Score', avgPct != null ? '${avgPct.toStringAsFixed(1)}%' : 'N/A', avgPct != null ? _computeGrade(avgPct) : null),
               pw.SizedBox(width: 10),
-              _whiteOverviewCard('Attendance', totalDays > 0 ? '${attPct.toStringAsFixed(1)}%' : '—', null),
+              _whiteOverviewCard('Attendance', totalDays > 0 ? '${attPct.toStringAsFixed(1)}%' : 'N/A', null),
               pw.SizedBox(width: 10),
-              _whiteOverviewCard('Exams Taken', examCount > 0 ? '$examCount' : '—', null),
+              _whiteOverviewCard('Exams Taken', '$examCount', null),
             ],
           ),
           if (classAverage != null && avgPct != null) ...[
@@ -798,21 +829,21 @@ class ReportPdfService {
             pw.Container(
               padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: _white, width: 1),
+                border: pw.Border.all(color: _black, width: 1),
                 borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
               ),
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.center,
                 children: [
-                  pw.Text('Class Average: ${classAverage.toStringAsFixed(1)}%', style: pw.TextStyle(fontSize: 11, color: _white)),
+                  pw.Text('Class Average: ${classAverage.toStringAsFixed(1)}%', style: pw.TextStyle(fontSize: 11, color: _black)),
                   pw.SizedBox(width: 10),
                   pw.Text(
-                    avgPct > classAverage 
-                      ? '(Above average)' 
-                      : avgPct < classAverage 
-                        ? '(Below average)' 
+                    avgPct > classAverage
+                      ? '(Above average)'
+                      : avgPct < classAverage
+                        ? '(Below average)'
                         : '(At average)',
-                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _white),
+                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _black),
                   ),
                 ],
               ),
@@ -900,7 +931,7 @@ class ReportPdfService {
   static pw.Widget _attendanceSummary(int present, int late, int absent, int total, double pct) {
     return pw.Container(
       decoration: pw.BoxDecoration(
-        color: _black,
+        color: _grayBg,
         border: pw.Border.all(color: _black, width: 1),
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
       ),
@@ -915,10 +946,10 @@ class ReportPdfService {
           pw.Container(
             padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: _white, width: 1.5),
+              border: pw.Border.all(color: _black, width: 1.5),
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
             ),
-            child: pw.Text('${pct.toStringAsFixed(1)}%', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: _white)),
+            child: pw.Text('${pct.toStringAsFixed(1)}%', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: _black)),
           ),
         ],
       ),
@@ -927,6 +958,8 @@ class ReportPdfService {
 
   static pw.Widget _disciplineSection(Map<String, String> data, double? avgPct) {
     final grade = avgPct != null ? _computeGrade(avgPct) : null;
+    final rating = _ratingFromAvg(avgPct);
+    final entries = data.entries.toList();
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -940,31 +973,80 @@ class ReportPdfService {
             ),
             child: pw.Text('Overall Grade: $grade', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
           ),
-        ...data.entries.map((e) {
-          return pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 8),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Container(
-                  width: 4,
-                  height: 50,
-                  decoration: const pw.BoxDecoration(color: _black),
-                  margin: const pw.EdgeInsets.only(right: 10),
-                ),
-                pw.Expanded(
-                  child: pw.Column(
+        pw.Container(
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _black, width: 1),
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+          ),
+          padding: const pw.EdgeInsets.all(10),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _boxTitle('DISCIPLINE & ACTIVITIES'),
+              pw.SizedBox(height: 8),
+              ...entries.asMap().entries.map((indexed) {
+                final i = indexed.key;
+                final e = indexed.value;
+                final isLast = i == entries.length - 1;
+                return pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 6),
+                  decoration: pw.BoxDecoration(
+                    border: isLast
+                        ? null
+                        : pw.Border(bottom: pw.BorderSide(color: _gray200, width: 0.6)),
+                  ),
+                  child: pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(e.key, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                      pw.Text(e.value, style: pw.TextStyle(fontSize: 10, color: _gray600)),
+                      pw.Container(
+                        width: 18,
+                        height: 18,
+                        margin: const pw.EdgeInsets.only(right: 8, top: 1),
+                        decoration: pw.BoxDecoration(
+                          color: _black,
+                          shape: pw.BoxShape.circle,
+                        ),
+                        alignment: pw.Alignment.center,
+                        child: pw.Text(
+                          _disciplineIcon(e.key),
+                          style: pw.TextStyle(
+                            fontSize: 9,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _white,
+                          ),
+                        ),
+                      ),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: pw.CrossAxisAlignment.center,
+                              children: [
+                                pw.Expanded(
+                                  child: pw.Text(e.key,
+                                    style: pw.TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                    )),
+                                ),
+                                _ratingDots(rating),
+                              ],
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Text(e.value,
+                              style: pw.TextStyle(fontSize: 8, color: _gray600)),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          );
-        }),
+                );
+              }),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1036,7 +1118,7 @@ class ReportPdfService {
   }
 
   // ─── Helper Widgets ───────────────────────────────────────────────────────
-  static pw.Widget _statCard(String label, String value) {
+  static pw.Widget _statCard(String label, String value, {PdfColor? valueColor}) {
     return pw.Expanded(
       child: pw.Container(
         decoration: pw.BoxDecoration(
@@ -1048,11 +1130,32 @@ class ReportPdfService {
           children: [
             pw.Text(label, style: pw.TextStyle(fontSize: 9)),
             pw.SizedBox(height: 4),
-            pw.Text(value, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text(value,
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: valueColor ?? _black,
+              )),
           ],
         ),
       ),
     );
+  }
+
+  static PdfColor? _scoreColor(double? pct) {
+    if (pct == null) return null;
+    if (pct >= 80) return const PdfColor.fromInt(0xFF16A34A);
+    if (pct >= 60) return const PdfColor.fromInt(0xFFD97706);
+    if (pct >= 40) return const PdfColor.fromInt(0xFFF97316);
+    return const PdfColor.fromInt(0xFFDC2626);
+  }
+
+  static PdfColor? _attendanceColor(double? pct) {
+    if (pct == null) return null;
+    if (pct >= 90) return const PdfColor.fromInt(0xFF16A34A);
+    if (pct >= 75) return const PdfColor.fromInt(0xFFD97706);
+    if (pct >= 60) return const PdfColor.fromInt(0xFFF97316);
+    return const PdfColor.fromInt(0xFFDC2626);
   }
 
   static pw.Widget _boxTitle(String text) {
@@ -1078,7 +1181,19 @@ class ReportPdfService {
     return 0;
   }
 
+  static PdfColor _ratingColor(int rating) {
+    switch (rating) {
+      case 5: return const PdfColor.fromInt(0xFF16A34A);
+      case 4: return const PdfColor.fromInt(0xFF0D9488);
+      case 3: return const PdfColor.fromInt(0xFFD97706);
+      case 2: return const PdfColor.fromInt(0xFFF97316);
+      case 1: return const PdfColor.fromInt(0xFFDC2626);
+      default: return _gray400;
+    }
+  }
+
   static pw.Widget _ratingDots(int rating) {
+    final fill = _ratingColor(rating);
     return pw.Row(
       mainAxisSize: pw.MainAxisSize.min,
       children: List.generate(5, (i) {
@@ -1088,8 +1203,8 @@ class ReportPdfService {
           height: 7,
           margin: const pw.EdgeInsets.only(left: 2),
           decoration: pw.BoxDecoration(
-            color: filled ? _black : _white,
-            border: pw.Border.all(color: _black, width: 0.8),
+            color: filled ? fill : _white,
+            border: pw.Border.all(color: filled ? fill : _black, width: 0.8),
             shape: pw.BoxShape.circle,
           ),
         );
@@ -1125,7 +1240,7 @@ class ReportPdfService {
     return pw.Text(text, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, letterSpacing: 0.5, color: _white));
   }
 
-  static pw.Widget _whiteAttendanceBadge(String label, int count) {
+  static pw.Widget _whiteAttendanceBadge(String label, int count, {PdfColor color = PdfColors.black}) {
     return pw.Row(
       mainAxisSize: pw.MainAxisSize.min,
       children: [
@@ -1133,14 +1248,14 @@ class ReportPdfService {
           width: 24,
           height: 24,
           decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: _white, width: 1.5),
+            color: color,
             shape: pw.BoxShape.circle,
           ),
           alignment: pw.Alignment.center,
           child: pw.Text(label, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _white)),
         ),
         pw.SizedBox(width: 4),
-        pw.Text('$count', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: _white)),
+        pw.Text('$count', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: color)),
       ],
     );
   }
@@ -1149,27 +1264,27 @@ class ReportPdfService {
     return pw.Expanded(
       child: pw.Container(
         decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: _white, width: 1),
+          border: pw.Border.all(color: _black, width: 1),
           borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
         ),
         padding: const pw.EdgeInsets.all(10),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text(label, style: pw.TextStyle(fontSize: 9, color: _white)),
+            pw.Text(label, style: pw.TextStyle(fontSize: 9, color: _black)),
             pw.SizedBox(height: 6),
             pw.Row(
               children: [
-                pw.Text(value, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: _white)),
+                pw.Text(value, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: _black)),
                 if (badge != null) ...[
                   pw.SizedBox(width: 8),
                   pw.Container(
                     padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: _white, width: 1.5),
+                      border: pw.Border.all(color: _black, width: 1.5),
                       borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
                     ),
-                    child: pw.Text(badge, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _white)),
+                    child: pw.Text(badge, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _black)),
                   ),
                 ],
               ],
@@ -1183,9 +1298,9 @@ class ReportPdfService {
   static pw.Widget _whiteAttendanceItem(String label, int value) {
     return pw.Column(
       children: [
-        pw.Text(label, style: pw.TextStyle(fontSize: 10, color: _white)),
+        pw.Text(label, style: pw.TextStyle(fontSize: 10, color: _black)),
         pw.SizedBox(height: 6),
-        pw.Text('$value', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: _white)),
+        pw.Text('$value', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: _black)),
       ],
     );
   }

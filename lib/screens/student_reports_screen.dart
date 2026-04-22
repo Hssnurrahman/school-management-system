@@ -758,35 +758,6 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
     }
   }
 
-  double _computeGpa() {
-    final percentages = [
-      ..._examResults
-          .where((r) => r.marksObtained != null)
-          .map((r) => (r.marksObtained! / r.totalMarks) * 100),
-    ];
-    if (percentages.isEmpty) return 0.0;
-    double total = 0;
-    for (final pct in percentages) {
-      final p = pct / 100;
-      if (p >= 0.9) {
-        total += 4.0;
-      } else if (p >= 0.8) {
-        total += 3.7;
-      } else if (p >= 0.7) {
-        total += 3.3;
-      } else if (p >= 0.6) {
-        total += 3.0;
-      } else if (p >= 0.5) {
-        total += 2.0;
-      } else if (p >= 0.33) {
-        total += 1.0;
-      } else {
-        total += 0.0;
-      }
-    }
-    return total / percentages.length;
-  }
-
   double? _averageMarkPercentage() {
     final vals = [
       ..._examResults
@@ -795,6 +766,23 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
     ];
     if (vals.isEmpty) return null;
     return vals.reduce((a, b) => a + b) / vals.length;
+  }
+
+  Color? _colorForScore(double? pct) {
+    if (pct == null) return null;
+    if (pct >= 80) return const Color(0xFF16A34A);
+    if (pct >= 60) return const Color(0xFFD97706);
+    if (pct >= 40) return const Color(0xFFF97316);
+    return const Color(0xFFDC2626);
+  }
+
+  Color? _colorForAttendance(double? rate) {
+    if (rate == null) return null;
+    final pct = rate * 100;
+    if (pct >= 90) return const Color(0xFF16A34A);
+    if (pct >= 75) return const Color(0xFFD97706);
+    if (pct >= 60) return const Color(0xFFF97316);
+    return const Color(0xFFDC2626);
   }
 
   String _reportSummaryText() {
@@ -814,7 +802,6 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
     if (avg != null) {
       sb.writeln('Average subject score: ${avg.toStringAsFixed(1)}%');
     }
-    sb.writeln('GPA: ${_computeGpa().toStringAsFixed(2)}');
     sb.writeln('— Exam results —');
     if (_examResults.isEmpty) {
       sb.writeln('None recorded');
@@ -1239,7 +1226,6 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gpa = _computeGpa();
     final avgPct = _averageMarkPercentage();
     final s = widget.student;
     final attRate = s.attendanceRate;
@@ -1312,16 +1298,12 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
                                 _DetailStat(
-                                  label: 'GPA',
-                                  value: gpa.toStringAsFixed(2),
-                                  icon: Icons.emoji_events_rounded,
-                                ),
-                                _DetailStat(
                                   label: 'Avg %',
                                   value: avgPct != null
                                       ? '${avgPct.toStringAsFixed(1)}%'
                                       : '—',
                                   icon: Icons.percent_rounded,
+                                  statusColor: _colorForScore(avgPct),
                                 ),
                                 _DetailStat(
                                   label: 'Attendance',
@@ -1329,6 +1311,7 @@ class _StudentReportDetailScreenState extends State<_StudentReportDetailScreen> 
                                       ? '${(attRate * 100).round()}%'
                                       : '—',
                                   icon: Icons.event_available_rounded,
+                                  statusColor: _colorForAttendance(attRate),
                                 ),
                               ],
                             ),
@@ -1471,27 +1454,42 @@ class _DetailStat extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
+  final Color? statusColor;
 
   const _DetailStat({
     required this.label,
     required this.value,
     required this.icon,
+    this.statusColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final valueText = Text(
+      value,
+      style: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w900,
+        fontSize: 19,
+      ),
+    );
     return Column(
       children: [
         Icon(icon, color: Colors.white70, size: 22),
         const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: 19,
-          ),
-        ),
+        if (statusColor != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: statusColor!.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
+            ),
+            child: valueText,
+          )
+        else
+          valueText,
+        const SizedBox(height: 2),
         Text(
           label,
           style: TextStyle(
@@ -1688,9 +1686,10 @@ class _ExamResultRow extends StatelessWidget {
   });
 
   String _dateLine() {
-    if (exam == null) return '';
-    final d = exam!.date;
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final d = result.marksUpdatedAt;
+    if (d == null) return '';
+    final date = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    return 'Marks entered: $date';
   }
 
   @override

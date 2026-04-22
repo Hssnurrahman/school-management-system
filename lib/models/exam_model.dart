@@ -102,6 +102,7 @@ class ExamResult {
   final double? marksObtained;
   final double totalMarks;
   final String? remarks;
+  final DateTime? marksUpdatedAt;
 
   ExamResult({
     required this.id,
@@ -111,6 +112,7 @@ class ExamResult {
     this.marksObtained,
     required this.totalMarks,
     this.remarks,
+    this.marksUpdatedAt,
   });
 
   String get grade {
@@ -128,6 +130,7 @@ class ExamResult {
         'marksObtained': marksObtained,
         'totalMarks': totalMarks,
         'remarks': remarks,
+        'marksUpdatedAt': marksUpdatedAt?.toIso8601String(),
       };
 
   factory ExamResult.fromJson(Map<String, dynamic> json) => ExamResult(
@@ -138,5 +141,12 @@ class ExamResult {
         marksObtained: (json['marksObtained'] as num?)?.toDouble(),
         totalMarks: (json['totalMarks'] as num?)?.toDouble() ?? 0.0,
         remarks: json['remarks'] as String?,
+        marksUpdatedAt: _parseNullableDate(json['marksUpdatedAt']),
       );
+
+  static DateTime? _parseNullableDate(Object? raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    return DateTime.tryParse(raw.toString());
+  }
 }
